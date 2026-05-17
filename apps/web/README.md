@@ -2,6 +2,8 @@
 
 React + Vite + Tailwind + TanStack Query frontend for the Uptime Monitor API.
 
+Live at https://uptime.ahmedmelouk.com (API: https://api.ahmedmelouk.com).
+
 ## Local setup
 
 ```bash
