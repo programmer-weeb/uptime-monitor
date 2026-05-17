@@ -86,6 +86,55 @@ monitorsRouter.post(
 );
 
 monitorsRouter.get(
+  '/:id/stats',
+  validate(monitorIdParamsSchema, 'params'),
+  async (req: Request, res: Response) => {
+    const id = paramId(req);
+    const monitor = await prisma.monitor.findFirst({
+      where: { id, userId: req.user!.id },
+      select: { id: true },
+    });
+    if (!monitor) {
+      throw new ApiError('NOT_FOUND', 'Monitor not found');
+    }
+
+    const windowStart = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const checks = await prisma.check.findMany({
+      where: {
+        monitorId: id,
+        checkedAt: { gte: windowStart },
+      },
+      select: {
+        status: true,
+        latencyMs: true,
+        checkedAt: true,
+      },
+    });
+
+    const totalChecks24h = checks.length;
+    const upChecks = checks.filter((check) => check.status === 'up');
+    const downChecks = checks.filter((check) => check.status === 'down');
+    const lastDownAt = downChecks.reduce<Date | null>(
+      (newest, check) => (!newest || check.checkedAt > newest ? check.checkedAt : newest),
+      null,
+    );
+
+    res.json({
+      uptimePct24h:
+        totalChecks24h === 0 ? null : Math.round((upChecks.length / totalChecks24h) * 10_000) / 100,
+      avgLatencyMs24h:
+        upChecks.length === 0
+          ? null
+          : Math.round(
+              upChecks.reduce((sum, check) => sum + check.latencyMs, 0) / upChecks.length,
+            ),
+      lastDownAt: lastDownAt?.toISOString() ?? null,
+      totalChecks24h,
+    });
+  },
+);
+
+monitorsRouter.get(
   '/:id',
   validate(monitorIdParamsSchema, 'params'),
   async (req: Request, res: Response) => {

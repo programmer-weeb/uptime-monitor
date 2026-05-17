@@ -41,3 +41,25 @@ export async function createMonitor(opts: CreateMonitorOpts) {
     },
   });
 }
+
+type CreateCheckOpts = {
+  monitorId: string;
+  status?: 'up' | 'down';
+  statusCode?: number | null;
+  latencyMs?: number;
+  error?: string | null;
+  checkedAt?: Date;
+};
+
+export async function createCheck(opts: CreateCheckOpts) {
+  return prisma.check.create({
+    data: {
+      monitorId: opts.monitorId,
+      status: opts.status ?? 'up',
+      statusCode: opts.statusCode ?? (opts.status === 'down' ? null : 200),
+      latencyMs: opts.latencyMs ?? 100,
+      error: opts.error ?? null,
+      checkedAt: opts.checkedAt,
+    },
+  });
+}

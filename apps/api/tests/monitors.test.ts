@@ -3,7 +3,7 @@ import request from 'supertest';
 import dns from 'node:dns';
 import { createApp } from '../src/app.js';
 import { prisma } from './helpers.js';
-import { createUser, createMonitor } from './factories.js';
+import { createUser, createMonitor, createCheck } from './factories.js';
 import { signToken } from '../src/lib/jwt.js';
 import { removeMonitorSchedule, scheduleMonitorCheck } from '../src/jobs/queue.js';
 import './helpers.js';
@@ -272,6 +272,104 @@ describe('GET /api/monitors/:id', () => {
     const m = await createMonitor({ userId: a.id });
     const res = await request(app).get(`/api/monitors/${m.id}`).set(...bearer(bToken));
     expect(res.status).toBe(404);
+  });
+});
+
+describe('GET /api/monitors/:id/stats', () => {
+  it('returns 24h stats for mixed up and down checks', async () => {
+    const { user, token } = await authedUser();
+    const m = await createMonitor({ userId: user.id });
+    const now = Date.now();
+    const newestDownAt = new Date(now - 2_000);
+
+    await createCheck({
+      monitorId: m.id,
+      status: 'up',
+      latencyMs: 100,
+      checkedAt: new Date(now - 10_000),
+    });
+    await createCheck({
+      monitorId: m.id,
+      status: 'up',
+      latencyMs: 101,
+      checkedAt: new Date(now - 8_000),
+    });
+    await createCheck({
+      monitorId: m.id,
+      status: 'down',
+      latencyMs: 1_000,
+      checkedAt: newestDownAt,
+    });
+
+    const res = await request(app).get(`/api/monitors/${m.id}/stats`).set(...bearer(token));
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      uptimePct24h: 66.67,
+      avgLatencyMs24h: 101,
+      lastDownAt: newestDownAt.toISOString(),
+      totalChecks24h: 3,
+    });
+  });
+
+  it('returns null stats and zero count when there are no checks', async () => {
+    const { user, token } = await authedUser();
+    const m = await createMonitor({ userId: user.id });
+
+    const res = await request(app).get(`/api/monitors/${m.id}/stats`).set(...bearer(token));
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      uptimePct24h: null,
+      avgLatencyMs24h: null,
+      lastDownAt: null,
+      totalChecks24h: 0,
+    });
+  });
+
+  it('ignores checks older than 24 hours', async () => {
+    const { user, token } = await authedUser();
+    const m = await createMonitor({ userId: user.id });
+    const now = Date.now();
+
+    await createCheck({
+      monitorId: m.id,
+      status: 'down',
+      latencyMs: 500,
+      checkedAt: new Date(now - 25 * 60 * 60 * 1000),
+    });
+    await createCheck({
+      monitorId: m.id,
+      status: 'up',
+      latencyMs: 80,
+      checkedAt: new Date(now - 60_000),
+    });
+
+    const res = await request(app).get(`/api/monitors/${m.id}/stats`).set(...bearer(token));
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      uptimePct24h: 100,
+      avgLatencyMs24h: 80,
+      lastDownAt: null,
+      totalChecks24h: 1,
+    });
+  });
+
+  it("returns 404 for another user's monitor", async () => {
+    const { user: a } = await authedUser();
+    const { token: bToken } = await authedUser();
+    const m = await createMonitor({ userId: a.id });
+    await createCheck({ monitorId: m.id, status: 'up' });
+
+    const res = await request(app).get(`/api/monitors/${m.id}/stats`).set(...bearer(bToken));
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('NOT_FOUND');
+  });
+
+  it('returns 404 for a missing monitor', async () => {
+    const { token } = await authedUser();
+
+    const res = await request(app).get('/api/monitors/does-not-exist/stats').set(...bearer(token));
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('NOT_FOUND');
   });
 });
 
