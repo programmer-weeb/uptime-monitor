@@ -616,6 +616,8 @@ Each day below is a focused evening (~2–3 hours). Adjust the calendar to your 
     - Added `processCheckJob(...)` in `src/jobs/checkProcessor.ts`: it skips missing/paused monitors, runs `runCheck`, writes a `checks` row, updates `currentStatus` and `lastCheckedAt`, increments `consecutiveFailures` on down, and resets failures on up.
     - `server.ts` now honors `APP_MODE=all|api|worker`: `all` runs the API and worker in one process for the MVP, `api` runs HTTP only, and `worker` runs only the BullMQ processor.
     - Tests mock the queue for route-level scheduling assertions and test the processor directly without requiring Redis.
+    - **Post-merge fix:** the initial commit shipped without the §15.6 startup walk, so monitors inserted via `prisma db seed` (or any path that bypassed `scheduleMonitorCheck`) stayed un-scheduled until something edited them. `server.ts` now runs `scheduleExistingMonitors()` on every worker boot — finds all un-paused monitors and upserts a scheduler for each. Idempotent via `upsertJobScheduler`. Caught during the Day 14 local smoke test.
+    - **Post-merge fix:** the check processor was missing the §15.4 per-check `log.info({ monitorId, status, latencyMs, error }, 'check completed')` line. Added after `recordCheckTransition` commits so failed DB writes don't produce false-positive completion lines.
 
 - [x] **Day 6 — Stats endpoint + retention job.** ✅ Done.
   `GET /api/monitors/:id/stats` — Prisma `groupBy` (or `$queryRaw` for a single-pass version) over the last 24h of checks: uptime percentage, average latency, last-down timestamp. Add a daily BullMQ repeatable job that runs `prisma.check.deleteMany({ where: { checkedAt: { lt: cutoff } } })` to prune checks older than 30 days. Tests with seeded check data.
@@ -708,7 +710,8 @@ Each day below is a focused evening (~2–3 hours). Adjust the calendar to your 
     - The Monitor model's `intervalMinutes` is `Int` in Prisma but the route zod schema restricts it to `1|5|15|30|60`. The seed writes 10 directly via Prisma so the demo runs at a 10-min interval per §9 — the zod restriction would otherwise block it. BullMQ honors the raw value (`every: 10 * 60_000ms`).
     - Landing page redirect to `/login` and `v1.0.0` tag both wait for Day 13 deploy + smoke test.
     - README screenshots and live-URL section also wait for Day 13. Everything else in the README is current as of this branch.
-    - **Known gap from Day 4 (not blocking Day 14):** the check runner test file covers success, BLOCKED (redirect to internal IP), BODY_TOO_LARGE, and the UA header — but is missing dedicated tests for `TIMEOUT`, `DNS`, and `HTTP_5XX`/`HTTP_4XX` per the §15.9 spec. Worth backfilling before tagging v1.0.0.
+    - The Day 4 check runner test gap (missing `TIMEOUT`, `DNS`, `HTTP_4XX`, `HTTP_5XX` cases) was backfilled in a follow-up `fix/check-runner-test-coverage` commit so the §15.9 box is now fully ticked.
+    - Local smoke test passed against system Postgres (`:5432`) and locally installed valkey (Arch's Redis-compatible default, `:6379`): login as `demo@example.com`, GET monitors, see live check results in the dashboard, demo write attempts return 403. Cloudflare's homepage trips `BODY_TOO_LARGE` as designed — worth swapping for a smaller URL before tagging v1.0.0.
 
 ## 10. Testing strategy
 
