@@ -1,5 +1,7 @@
 # Uptime Monitor
 
+Live at https://uptime.ahmedmelouk.com (API: https://api.ahmedmelouk.com).
+
 A TypeScript uptime monitor. You register URLs, a worker pings each one on its configured schedule, and results land in PostgreSQL via Prisma. The dashboard updates live over Socket.IO. Email alerts go out on `up → down` (debounced past a single blip) and on recovery.
 
 Build notes, sequencing, and architectural decisions live in [`plan.md`](./plan.md).
