@@ -627,8 +627,12 @@ Each day below is a focused evening (~2–3 hours). Adjust the calendar to your 
     - The shared worker now dispatches both monitor check jobs and retention prune jobs; `server.ts` schedules retention when `APP_MODE=all|worker`.
     - Tests cover stats calculations, auth scoping, old-check exclusion, retention cutoff behavior, and the worker dispatch path without requiring Redis.
 
-- [ ] **Day 7 — Catch up / clean up.**
+- [x] **Day 7 — Catch up / clean up.** ✅ Done.
   You will be behind. Use this day. Refactor anything ugly. Write README skeleton.
+  - **Implementation notes (deviations from plan):**
+    - Reviewed the Day 6 API changes and kept the current implementation; no behavior-preserving refactor was worth mixing into this cleanup pass.
+    - Reworked the root README into a current project skeleton with stack, local setup, environment, API routes, web status, scripts, testing, CI, and remaining work.
+    - Tightened collaboration docs and GitHub templates around approved branch prefixes, Conventional Commits, PR testing notes, and issue context.
 
 ### Week 2 — Real-time, alerts, frontend, deploy
 
