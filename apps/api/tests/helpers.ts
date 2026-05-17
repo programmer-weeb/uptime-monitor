@@ -4,7 +4,11 @@ import { prisma } from '../src/config/prisma.js';
 export { prisma };
 
 export async function truncateAll(): Promise<void> {
-  await prisma.$executeRawUnsafe('TRUNCATE TABLE "users" RESTART IDENTITY CASCADE');
+  // Order doesn't matter with CASCADE, but list every table explicitly so
+  // adding a model becomes a compile-time grep target.
+  await prisma.$executeRawUnsafe(
+    'TRUNCATE TABLE "alert_events", "checks", "monitors", "users" RESTART IDENTITY CASCADE',
+  );
 }
 
 beforeEach(async () => {

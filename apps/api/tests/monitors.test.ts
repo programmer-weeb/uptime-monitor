@@ -1,0 +1,326 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import request from 'supertest';
+import dns from 'node:dns';
+import { createApp } from '../src/app.js';
+import { prisma } from './helpers.js';
+import { createUser, createMonitor } from './factories.js';
+import { signToken } from '../src/lib/jwt.js';
+import './helpers.js';
+
+const app = createApp();
+
+const bearer = (token: string): [string, string] => ['Authorization', `Bearer ${token}`];
+
+async function authedUser() {
+  const user = await createUser();
+  return { user, token: signToken(user.id) };
+}
+
+describe('GET /api/monitors', () => {
+  it('returns 401 without a token', async () => {
+    const res = await request(app).get('/api/monitors');
+    expect(res.status).toBe(401);
+  });
+
+  it('returns only the caller\'s monitors, newest first', async () => {
+    const { user: a, token } = await authedUser();
+    const { user: b } = await authedUser();
+
+    const older = await createMonitor({ userId: a.id, name: 'older' });
+    // Force a clear createdAt gap so ordering is deterministic regardless of clock resolution.
+    await prisma.monitor.update({ where: { id: older.id }, data: { createdAt: new Date(Date.now() - 60_000) } });
+    const newer = await createMonitor({ userId: a.id, name: 'newer' });
+    await createMonitor({ userId: b.id, name: 'other-user' });
+
+    const res = await request(app).get('/api/monitors').set(...bearer(token));
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(2);
+    expect(res.body[0].id).toBe(newer.id);
+    expect(res.body[1].id).toBe(older.id);
+    // Internal fields must not leak.
+    expect(res.body[0]).not.toHaveProperty('consecutiveFailures');
+    expect(res.body[0]).not.toHaveProperty('userId');
+  });
+});
+
+describe('POST /api/monitors', () => {
+  it('creates a monitor and returns the public shape', async () => {
+    const { token } = await authedUser();
+    const res = await request(app)
+      .post('/api/monitors')
+      .set(...bearer(token))
+      .send({ name: 'Example', url: 'https://example.com', intervalMinutes: 5 });
+
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({
+      name: 'Example',
+      url: 'https://example.com',
+      intervalMinutes: 5,
+      isPaused: false,
+      currentStatus: 'unknown',
+      lastCheckedAt: null,
+    });
+    expect(res.body.id).toEqual(expect.any(String));
+    expect(res.body.createdAt).toEqual(expect.any(String));
+    expect(res.body).not.toHaveProperty('consecutiveFailures');
+    expect(res.body).not.toHaveProperty('userId');
+  });
+
+  it('rejects unknown fields (strict schema)', async () => {
+    const { token } = await authedUser();
+    const res = await request(app)
+      .post('/api/monitors')
+      .set(...bearer(token))
+      .send({ name: 'X', url: 'https://example.com', intervalMinutes: 5, admin: true });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('VALIDATION');
+  });
+
+  it('rejects an unsupported interval', async () => {
+    const { token } = await authedUser();
+    const res = await request(app)
+      .post('/api/monitors')
+      .set(...bearer(token))
+      .send({ name: 'X', url: 'https://example.com', intervalMinutes: 2 });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('VALIDATION');
+  });
+
+  it('rejects http:// URLs with 422 URL_BLOCKED', async () => {
+    const { token } = await authedUser();
+    const res = await request(app)
+      .post('/api/monitors')
+      .set(...bearer(token))
+      .send({ name: 'X', url: 'http://example.com', intervalMinutes: 5 });
+    expect(res.status).toBe(422);
+    expect(res.body.error).toBe('URL_BLOCKED');
+  });
+
+  it('rejects http://localhost with 422 URL_BLOCKED', async () => {
+    const { token } = await authedUser();
+    const res = await request(app)
+      .post('/api/monitors')
+      .set(...bearer(token))
+      .send({ name: 'X', url: 'http://localhost', intervalMinutes: 5 });
+    expect(res.status).toBe(422);
+    expect(res.body.error).toBe('URL_BLOCKED');
+  });
+
+  it('rejects https://localhost (loopback resolution) with 422 URL_BLOCKED', async () => {
+    const { token } = await authedUser();
+    const res = await request(app)
+      .post('/api/monitors')
+      .set(...bearer(token))
+      .send({ name: 'X', url: 'https://localhost', intervalMinutes: 5 });
+    expect(res.status).toBe(422);
+    expect(res.body.error).toBe('URL_BLOCKED');
+  });
+
+  it('rejects literal RFC1918 IPv4 hosts', async () => {
+    const { token } = await authedUser();
+    const res = await request(app)
+      .post('/api/monitors')
+      .set(...bearer(token))
+      .send({ name: 'X', url: 'https://10.0.0.5', intervalMinutes: 5 });
+    expect(res.status).toBe(422);
+    expect(res.body.error).toBe('URL_BLOCKED');
+  });
+
+  it('rejects literal IPv6 loopback', async () => {
+    const { token } = await authedUser();
+    const res = await request(app)
+      .post('/api/monitors')
+      .set(...bearer(token))
+      .send({ name: 'X', url: 'https://[::1]', intervalMinutes: 5 });
+    expect(res.status).toBe(422);
+    expect(res.body.error).toBe('URL_BLOCKED');
+  });
+
+  describe('with a mocked DNS resolver', () => {
+    let lookupSpy: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      lookupSpy = vi.spyOn(dns.promises, 'lookup');
+    });
+    afterEach(() => {
+      lookupSpy.mockRestore();
+    });
+
+    it('rejects a hostname that resolves to the cloud metadata IP (169.254.169.254)', async () => {
+      // Simulate a domain like metadata.google.internal resolving to a link-local
+      // address — this is the canonical SSRF / cloud-metadata attack.
+      lookupSpy.mockResolvedValue([{ address: '169.254.169.254', family: 4 }] as unknown as dns.LookupAddress[]);
+
+      const { token } = await authedUser();
+      const res = await request(app)
+        .post('/api/monitors')
+        .set(...bearer(token))
+        .send({ name: 'X', url: 'https://metadata.google.internal', intervalMinutes: 5 });
+      expect(res.status).toBe(422);
+      expect(res.body.error).toBe('URL_BLOCKED');
+    });
+
+    it('rejects a hostname that resolves to an IPv4-mapped IPv6 loopback (::ffff:127.0.0.1)', async () => {
+      lookupSpy.mockResolvedValue([
+        { address: '::ffff:127.0.0.1', family: 6 },
+      ] as unknown as dns.LookupAddress[]);
+
+      const { token } = await authedUser();
+      const res = await request(app)
+        .post('/api/monitors')
+        .set(...bearer(token))
+        .send({ name: 'X', url: 'https://sneaky.example.com', intervalMinutes: 5 });
+      expect(res.status).toBe(422);
+      expect(res.body.error).toBe('URL_BLOCKED');
+    });
+
+    it('accepts a public-IP hostname', async () => {
+      lookupSpy.mockResolvedValue([{ address: '93.184.216.34', family: 4 }] as unknown as dns.LookupAddress[]);
+
+      const { token } = await authedUser();
+      const res = await request(app)
+        .post('/api/monitors')
+        .set(...bearer(token))
+        .send({ name: 'OK', url: 'https://example.com', intervalMinutes: 1 });
+      expect(res.status).toBe(201);
+    });
+  });
+
+  it('enforces the 10-monitor cap with 409 MONITOR_LIMIT_REACHED', async () => {
+    const { user, token } = await authedUser();
+    for (let i = 0; i < 10; i++) {
+      await createMonitor({ userId: user.id, name: `m-${i}` });
+    }
+    const res = await request(app)
+      .post('/api/monitors')
+      .set(...bearer(token))
+      .send({ name: 'eleventh', url: 'https://example.com', intervalMinutes: 5 });
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('MONITOR_LIMIT_REACHED');
+
+    // Confirms the cap is per-user — a second user can still create.
+    const { token: otherToken } = await authedUser();
+    const okRes = await request(app)
+      .post('/api/monitors')
+      .set(...bearer(otherToken))
+      .send({ name: 'fresh', url: 'https://example.com', intervalMinutes: 5 });
+    expect(okRes.status).toBe(201);
+  });
+
+  it('mounts the per-user rate limiter (drops draft-7 RateLimit headers)', async () => {
+    const { token } = await authedUser();
+    const res = await request(app)
+      .post('/api/monitors')
+      .set(...bearer(token))
+      .send({ name: 'M', url: 'https://example.com', intervalMinutes: 5 });
+    expect(res.status).toBe(201);
+    // express-rate-limit with standardHeaders: 'draft-7' emits a combined
+    // `RateLimit` header plus `RateLimit-Policy`. Presence proves the limiter
+    // ran in front of the handler. In test env the *limit* is bumped to 1000
+    // so the test never trips RATE_LIMITED itself (see middleware/rateLimit.ts).
+    expect(res.headers['ratelimit-policy']).toBeDefined();
+    expect(res.headers['ratelimit']).toBeDefined();
+  });
+});
+
+describe('GET /api/monitors/:id', () => {
+  it('returns the monitor for the owner', async () => {
+    const { user, token } = await authedUser();
+    const m = await createMonitor({ userId: user.id });
+    const res = await request(app).get(`/api/monitors/${m.id}`).set(...bearer(token));
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe(m.id);
+    expect(res.body).not.toHaveProperty('consecutiveFailures');
+  });
+
+  it('returns 404 for a non-existent id', async () => {
+    const { token } = await authedUser();
+    const res = await request(app).get('/api/monitors/does-not-exist').set(...bearer(token));
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('NOT_FOUND');
+  });
+
+  it("returns 404 (not 403) for another user's monitor — no enumeration", async () => {
+    const { user: a } = await authedUser();
+    const { token: bToken } = await authedUser();
+    const m = await createMonitor({ userId: a.id });
+    const res = await request(app).get(`/api/monitors/${m.id}`).set(...bearer(bToken));
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('PATCH /api/monitors/:id', () => {
+  it('updates name, intervalMinutes, and isPaused', async () => {
+    const { user, token } = await authedUser();
+    const m = await createMonitor({ userId: user.id });
+    const res = await request(app)
+      .patch(`/api/monitors/${m.id}`)
+      .set(...bearer(token))
+      .send({ name: 'Renamed', intervalMinutes: 30, isPaused: true });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      id: m.id,
+      name: 'Renamed',
+      intervalMinutes: 30,
+      isPaused: true,
+    });
+  });
+
+  it('rejects an empty body (at least one field required)', async () => {
+    const { user, token } = await authedUser();
+    const m = await createMonitor({ userId: user.id });
+    const res = await request(app).patch(`/api/monitors/${m.id}`).set(...bearer(token)).send({});
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('VALIDATION');
+  });
+
+  it('rejects unknown fields (strict)', async () => {
+    const { user, token } = await authedUser();
+    const m = await createMonitor({ userId: user.id });
+    const res = await request(app)
+      .patch(`/api/monitors/${m.id}`)
+      .set(...bearer(token))
+      .send({ url: 'https://changed.example.com' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('VALIDATION');
+  });
+
+  it("returns 404 for another user's monitor", async () => {
+    const { user: a } = await authedUser();
+    const { token: bToken } = await authedUser();
+    const m = await createMonitor({ userId: a.id });
+    const res = await request(app)
+      .patch(`/api/monitors/${m.id}`)
+      .set(...bearer(bToken))
+      .send({ isPaused: true });
+    expect(res.status).toBe(404);
+
+    // And the original row must be unchanged.
+    const reloaded = await prisma.monitor.findUnique({ where: { id: m.id } });
+    expect(reloaded?.isPaused).toBe(false);
+  });
+});
+
+describe('DELETE /api/monitors/:id', () => {
+  it('returns 204, then GET returns 404', async () => {
+    const { user, token } = await authedUser();
+    const m = await createMonitor({ userId: user.id });
+
+    const delRes = await request(app).delete(`/api/monitors/${m.id}`).set(...bearer(token));
+    expect(delRes.status).toBe(204);
+    expect(delRes.body).toEqual({});
+
+    const getRes = await request(app).get(`/api/monitors/${m.id}`).set(...bearer(token));
+    expect(getRes.status).toBe(404);
+  });
+
+  it("returns 404 for another user's monitor and leaves the row intact", async () => {
+    const { user: a } = await authedUser();
+    const { token: bToken } = await authedUser();
+    const m = await createMonitor({ userId: a.id });
+    const res = await request(app).delete(`/api/monitors/${m.id}`).set(...bearer(bToken));
+    expect(res.status).toBe(404);
+
+    const still = await prisma.monitor.findUnique({ where: { id: m.id } });
+    expect(still).not.toBeNull();
+  });
+});

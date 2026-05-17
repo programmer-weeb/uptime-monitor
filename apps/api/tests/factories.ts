@@ -19,3 +19,25 @@ export async function createUser(opts: CreateUserOpts = {}) {
     },
   });
 }
+
+type Interval = 1 | 5 | 15 | 30 | 60;
+
+type CreateMonitorOpts = {
+  userId: string;
+  name?: string;
+  url?: string;
+  intervalMinutes?: Interval;
+  isPaused?: boolean;
+};
+
+export async function createMonitor(opts: CreateMonitorOpts) {
+  return prisma.monitor.create({
+    data: {
+      userId: opts.userId,
+      name: opts.name ?? 'Test monitor',
+      url: opts.url ?? 'https://example.com',
+      intervalMinutes: opts.intervalMinutes ?? 5,
+      isPaused: opts.isPaused ?? false,
+    },
+  });
+}
