@@ -660,8 +660,13 @@ Each day below is a focused evening (~2–3 hours). Adjust the calendar to your 
     - The detail page fetches monitor metadata, 24-hour stats, and recent checks, then renders prominent uptime metrics, a latency line chart, the latest checks table, and a pause/resume toggle.
     - Dashboard monitor names now link to their detail pages.
 
-- [ ] **Day 11 — Socket.IO + live updates.**
+- [x] **Day 11 — Socket.IO + live updates.** ✅ Done.
   Add Socket.IO to API. Worker emits `check:completed` and `monitor:status_changed` to the `user:<userId>` room. Frontend subscribes; TanStack Query cache updates on each event so the dashboard table and detail chart move in real time without polling.
+  - **Implementation notes (deviations from plan):**
+    - Added an authenticated Socket.IO server on the API HTTP server; sockets verify JWTs, load the user, and join a private `user:<userId>` room.
+    - The check worker emits `check:completed` after every persisted check and `monitor:status_changed` only when the monitor status actually changes.
+    - Added `socket.io-client` to the web app via npm and a protected-route live update subscriber that patches monitor and recent-check caches, then invalidates stats for the affected monitor.
+    - API tests assert worker emissions without requiring a live Socket.IO server.
 
 - [ ] **Day 12 — Email alerts.**
   After a check, in `statusTransition.ts`:
