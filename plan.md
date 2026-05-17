@@ -569,8 +569,14 @@ Each day below is a focused evening (~2–3 hours). Adjust the calendar to your 
     - `prisma init` was skipped in favor of writing the minimal `prisma/schema.prisma` directly (datasource + generator). `prisma generate` is deferred to Day 2 when the first model lands — running it now errors with "no models defined."
     - `cors` was missing from §3's dep list. Installed (`cors@^2.8`, `@types/cors`). Should be folded into §3.
 
-- [ ] **Day 2 — Auth.**
+- [x] **Day 2 — Auth.** ✅ Done.
   Add the `User` model to `schema.prisma` and run `prisma migrate dev --name init`. `POST /api/auth/signup` (bcrypt hash, returns JWT), `POST /api/auth/login`, `GET /api/auth/me`. Zod validation. JWT middleware. Tests: signup creates user, login returns token, `/me` requires auth.
+  - **Implementation notes (deviations from plan):**
+    - Docker Desktop isn't running locally, so the dev/test DBs were created on the existing system Postgres (:5432) instead of via `docker-compose`. Both `uptime` and `uptime_test` live on `:5432` (not the `:5432`/`:5433` split from §15.2). `DATABASE_URL_TEST` updated accordingly in `.env`. When Docker is available, the split returns automatically — the test helper only requires the URL contain the string `test`.
+    - Added `tests/setup.ts` (vitest `setupFiles`) so tests get their env vars before any module imports `env.ts`. Cleaner than the per-file `beforeAll` env stubbing the prior health test used.
+    - Bcrypt cost gated on `NODE_ENV`: 4 in tests, 12 in dev/prod (per §5 + §16.9).
+    - `POST /api/auth/login` runs a dummy `bcrypt.compare` on the "user not found" branch so the timing matches the "wrong password" branch — prevents email enumeration via response-time analysis.
+    - Rate limits set to 1000/window in `NODE_ENV=test` so test sequencing doesn't trip them. Production values from §6 unchanged (3/hr signup, 10/min login).
 
 - [ ] **Day 3 — Monitor CRUD.**
   Add the `Monitor` model and run a migration. Full CRUD routes scoped by `userId`. Validate URL: must be `https://`, must not resolve to private/loopback/link-local/cloud-metadata ranges (write `urlGuard.ts` — this is your SSRF protection and a great resume bullet). Enforce 10-monitor cap. Apply the `POST /api/monitors` per-user rate limit (§6). Tests for each route, including the "user can't see another user's monitor" case and a `urlGuard` rejects-metadata-IP case.
@@ -1026,8 +1032,8 @@ Build in this order. Each box must be true before moving on.
 
 - [x] Repo initialized, `apps/api` and `apps/web` exist, root `.gitignore` and `docker-compose.yml` committed.
 - [x] `apps/api` boots: `npm run dev` → `:4000`, `GET /health → { ok: true }`. Zero deps un-pinned.
-- [ ] Prisma schema applied to dev DB (`prisma migrate dev --name init`). `prisma generate` runs clean.
-- [ ] Auth working end-to-end: signup → token → `/me` returns user. Tests pass.
+- [x] Prisma schema applied to dev DB (`prisma migrate dev --name init`). `prisma generate` runs clean.
+- [x] Auth working end-to-end: signup → token → `/me` returns user. Tests pass.
 - [ ] Monitor CRUD working, owner-scoped. `urlGuard` rejects all CIDRs in §15.3 (tests prove it). Rate limit enforced.
 - [ ] `runCheck` returns the exact `CheckResult` shape from §6 for: success, timeout, DNS failure, 5xx, redirect to internal IP (BLOCKED), 2MB body (BODY_TOO_LARGE).
 - [ ] BullMQ scheduler upserts jobs on create/edit, removes on pause/delete. Worker writes checks. Tested with `https://example.com`.
