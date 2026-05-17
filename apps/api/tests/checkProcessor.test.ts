@@ -8,6 +8,7 @@ import { pruneOldChecks } from '../src/jobs/retention.js';
 import type { CheckJobData, ChecksQueueJobData, ChecksQueueJobName } from '../src/jobs/queue.js';
 import { emitCheckCompleted, emitMonitorStatusChanged } from '../src/realtime/socket.js';
 import { sendAlertEmail } from '../src/services/alertEmail.js';
+import { log } from '../src/config/log.js';
 
 vi.mock('../src/services/checkRunner.js', () => ({
   runCheck: vi.fn(),
@@ -185,6 +186,32 @@ describe('processCheckJob', () => {
     expect(emitCheckCompletedMock).not.toHaveBeenCalled();
     expect(emitMonitorStatusChangedMock).not.toHaveBeenCalled();
     expect(sendAlertEmailMock).not.toHaveBeenCalled();
+  });
+
+  it('emits one structured log line per check completion (plan §15.4)', async () => {
+    const user = await createUser();
+    const monitor = await createMonitor({ userId: user.id });
+    runCheckMock.mockResolvedValueOnce({
+      status: 'up',
+      statusCode: 200,
+      latencyMs: 137,
+      error: null,
+    });
+    const logInfoSpy = vi.spyOn(log, 'info');
+
+    await processCheckJob(checkJob(monitor.id));
+
+    expect(logInfoSpy).toHaveBeenCalledWith(
+      {
+        monitorId: monitor.id,
+        status: 'up',
+        latencyMs: 137,
+        error: null,
+      },
+      'check completed',
+    );
+
+    logInfoSpy.mockRestore();
   });
 });
 
