@@ -1,8 +1,9 @@
-import express, { type Express, type NextFunction, type Request, type Response } from 'express';
+import express, { type Express, type Request, type Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { corsOrigins } from './config/env.js';
-import { log } from './config/log.js';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { authRouter } from './routes/auth.js';
 
 export function createApp(): Express {
   const app = express();
@@ -17,15 +18,10 @@ export function createApp(): Express {
     res.json({ ok: true });
   });
 
-  app.use((_req: Request, res: Response) => {
-    res.status(404).json({ error: 'NOT_FOUND', message: 'Route not found' });
-  });
+  app.use('/api/auth', authRouter);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
-    log.error({ err, path: req.path }, 'unhandled error');
-    res.status(500).json({ error: 'INTERNAL', message: 'Something went wrong' });
-  });
+  app.use(notFoundHandler);
+  app.use(errorHandler);
 
   return app;
 }

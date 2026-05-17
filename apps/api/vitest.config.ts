@@ -6,6 +6,6 @@ export default defineConfig({
     pool: 'forks',
     poolOptions: { forks: { singleFork: true } },
     include: ['tests/**/*.test.ts'],
-    setupFiles: [],
+    setupFiles: ['tests/setup.ts'],
   },
 });
