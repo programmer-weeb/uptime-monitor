@@ -652,8 +652,13 @@ Each day below is a focused evening (~2–3 hours). Adjust the calendar to your 
     - Dashboard now renders a compact monitor table with status, interval, last checked, and latency fallbacks.
     - Add Monitor uses a modal form and a TanStack Query mutation with optimistic cache insertion and invalidation.
 
-- [ ] **Day 10 — Monitor detail page.**
+- [x] **Day 10 — Monitor detail page.** ✅ Done.
   Route `/monitors/:id`. Fetches monitor + stats + last 100 checks. Latency line chart (Recharts). Uptime % displayed prominently. Pause/resume toggle.
+  - **Implementation notes (deviations from plan):**
+    - Added `GET /api/monitors/:id/checks?limit=100` as an owner-scoped endpoint returning recent checks newest first with a validated 1-100 limit.
+    - Installed Recharts via npm and added the protected `/monitors/:id` route.
+    - The detail page fetches monitor metadata, 24-hour stats, and recent checks, then renders prominent uptime metrics, a latency line chart, the latest checks table, and a pause/resume toggle.
+    - Dashboard monitor names now link to their detail pages.
 
 - [ ] **Day 11 — Socket.IO + live updates.**
   Add Socket.IO to API. Worker emits `check:completed` and `monitor:status_changed` to the `user:<userId>` room. Frontend subscribes; TanStack Query cache updates on each event so the dashboard table and detail chart move in real time without polling.
