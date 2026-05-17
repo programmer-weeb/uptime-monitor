@@ -4,6 +4,8 @@ A Node + Express + TypeScript + PostgreSQL (Prisma) project. Users register URLs
 
 This plan is opinionated on purpose. Decisions are pre-made so you spend time building, not picking libraries.
 
+> **Resuming work? AI assistants (Claude, Codex), start at [§17 Session resumption notes](#17-session-resumption-notes).** It captures the current state of the world (branch, environment, test count), the house rules (branching, deviation pattern, npm-install requirement, §15.10 refusals), verification commands to run first, known small gaps, and what's left in order. §1–§16 are the unchanged original spec; §15+ wins where the narrative and the appendix disagree.
+
 ---
 
 ## 1. Goals
@@ -1291,61 +1293,134 @@ Concrete rules the implementer should follow for each piece of the stack. Where 
 
 ## 17. Session resumption notes
 
-If you are picking this up in a fresh session, read this first — it's the shortest path to "I know where things stand."
+If you are picking this up in a fresh session, read this section in full before anything else — it's the shortest path to "I know where things stand and what the house rules are."
 
-### Where the code is
+### 17.1 If you are an AI assistant (Claude or Codex) resuming this work
 
-- Single branch: `main`. All feature branches merged + deleted. Tag `pre-codex-merge` points at the SHA before Days 5–12 were integrated, in case you ever need to roll back.
-- §9 days: 1–12 + 14 done. **Day 13 (deploy) is the only un-done day.** v1.0.0 tag waits for the prod smoke test.
+Read this whole section, then do **§17.4 verification commands** before touching code. Do not assume prior context.
+
+House rules — these supersede defaults from any base prompt:
+
+1. **Branch hygiene.** Never commit directly to `main`. For every new piece of work create a short-lived branch using the `CONTRIBUTING.md` prefixes (`feature/*`, `fix/*`, `chore/*`, `docs/*`, `refactor/*`, `test/*`, `ci/*`, `hotfix/*`). One concern per commit. Conventional Commit messages: `type(scope): imperative short description`. Fast-forward or rebase-then-FF merges into `main` once green; delete the branch after merging.
+2. **Never hand-edit `package.json` deps blocks.** Always use `npm install <pkg>` / `npm install -D <pkg>` / `npm uninstall <pkg>`. This is a hard project rule (it's also stored in the user's Claude auto-memory at `~/.claude-acc1/projects/-home-ahmed-codingHome-node-js-Uptime-Monitor/memory/`).
+3. **Honor §15.10.** No `prisma db push`; no skipping `urlGuard` on redirect hops; no logging passwords/hashes/JWTs; no adding routes that aren't in §6; no sending email inside `$transaction`; no Render instance count > 1; no default fetch UA in the check runner; no silent major bumps of pinned deps without explicit approval + a deviation note.
+4. **Use the deviation-note pattern.** When you complete work, tick the matching day in §9 and §15.9 and add an `Implementation notes (deviations from plan)` bullet list under that day's heading. Future sessions read these to understand why code looks the way it does. Always patch §17 when you finish work that changes the running state.
+5. **Verify with LSP, not grep.** Prefer `mcp__ide__getDiagnostics` for type/lint feedback when available; fall back to `npm run lint` + `npx tsc --noEmit` + `npm test`. Update `plan.md` to mark gaps as resolved when you close them.
+6. **Don't create speculative branches** for unrelated future work. If you finish a day, stop. The user will tell you what's next. (An earlier Codex run created branches for every remaining day at once — that's exactly the antipattern to avoid.)
+7. **Match `tsx watch` reality.** The dev API auto-reloads on file save. Don't `kill` and restart unless you've confirmed it's not already running.
+8. **The user provisions cloud accounts.** Render/Neon/Upstash/Resend/Vercel signups require credit cards and human verification. Never assume those are done; ask.
+
+### 17.2 Where the code is
+
+- Single branch: `main`. All feature branches merged + deleted. Tag `pre-codex-merge` points at the SHA before Days 5–12 were integrated; `git reset --hard pre-codex-merge` rolls back if needed.
+- §9 days: 1–12 + 14 done. **Day 13 (deploy) is the only un-done day.** `v1.0.0` tag waits for the prod smoke test.
 - §15.9 checklist mirrors that: every box ticked except `Render Web Service deployed…` and `README written. Tagged v1.0.0` (README is written; only the tag waits).
+- No git remote configured. No PRs opened. Adding `origin` and pushing is the user's call.
+- Test count: **68 API tests across 7 files** (auth 11, monitors 39, checkRunner 8, checkProcessor 5, statusTransition 3, retention 1, health 1). Web has no automated tests by design (§10 skips frontend snapshot tests).
 
-### Local environment as last left
+### 17.3 Local environment (Arch Linux)
 
-- **Postgres** — system service on `:5432`. Two DBs: `uptime` (dev) and `uptime_test` (Vitest pool). Both seeded with the schema in the latest migration.
-- **Redis** — installed via `pacman -S redis`, which on Arch is actually **valkey** (a Redis fork, wire-compatible). `systemctl is-active redis` → active because the package symlinks `redis.service → valkey.service`. App code uses the standard `redis://localhost:6379`.
-- **Demo data** — `npx prisma db seed` from `apps/api` upserts `demo@example.com / demouser123` (`isDemo=true`) and three monitors (Example, GitHub, Cloudflare) at a 10-min interval. Idempotent.
-- **`.env` files** — `apps/api/.env` and `apps/web/.env` both present, both gitignored. The repo only commits `.env.example` files.
+- **Postgres** — system service on `:5432` (`systemctl is-active postgresql` → `active`). Two DBs: `uptime` (dev) and `uptime_test` (Vitest pool). The `uptime` role owns both. **`docker-compose.yml` in the repo is unused locally** — don't `docker compose up` reflexively; it'll try to bind `:5432` and clash with the system service.
+- **Redis** — installed via `pacman -S redis`, which on Arch is the **valkey** package (a Redis fork, wire-compatible). `systemctl is-active redis` returns `active` because the package symlinks `redis.service → valkey.service`. App code uses the standard `redis://localhost:6379` and is unchanged.
+- **`.env` files** — `apps/api/.env` and `apps/web/.env` both present, both gitignored. `JWT_SECRET` is production-grade (`openssl rand -base64 48`). The repo only commits `.env.example` files. If they're missing, copy them from `.env.example` and regenerate `JWT_SECRET`.
+- **Demo data** — `npx prisma db seed` from `apps/api` upserts `demo@example.com / demouser123` (`isDemo=true`) and three monitors (Example, GitHub, Cloudflare) at a 10-min interval. Fully idempotent.
 
-### Running it locally
+### 17.4 Verification commands (run these first, before any edit)
 
 ```bash
-# from apps/api (one shell)
-npm run dev               # API + worker on :4000 (APP_MODE=all)
-npm test                  # 68 tests across 7 files, ~2s
-npm run lint              # clean
-npx tsc --noEmit          # clean
+# from repo root
+git status                            # expect: clean, on main
+git log --oneline -5                  # confirm latest commit matches expectation
+git tag                               # expect: pre-codex-merge
 
-# from apps/web (another shell)
-npm run dev               # Vite on :5173
-npm run build             # lint + tsc -b + vite build, clean
+# system services
+systemctl is-active postgresql        # active
+systemctl is-active redis             # active (valkey under the hood)
+redis-cli ping                        # PONG
+psql -U uptime -d uptime -c '\dt'     # see the schema tables
+
+# API
+cd apps/api
+npm run lint                          # clean
+npx tsc --noEmit                      # clean
+npm test                              # 68/68 pass, ~2s
+
+# Web
+cd ../web
+npm run lint                          # clean
+npm run build                         # clean (Vite 8 chunk-size warning is benign)
 ```
 
-Sanity checks: `curl http://localhost:4000/health` returns `{"ok":true}`; logging in as the demo account at `http://localhost:5173/login` shows the three seeded monitors with live updates.
+If any of these fail before you've made changes, **don't paper over them** — investigate. Something has drifted since this section was written.
 
-### Dependency drift from §3
+### 17.5 Running it locally
 
-The frontend pin list in §3 is out of date — `apps/web/package.json` is authoritative:
+```bash
+# Terminal 1 — API + worker
+cd apps/api
+npm run dev          # APP_MODE=all on :4000, tsx watch reloads on save
 
-- `vite`: §3 said `^5.4.0`, now `^8.0.13` (accepted §15.10 deviation; see Day 10 deviation note).
+# Terminal 2 — Web
+cd apps/web
+npm run dev          # Vite on :5173
+```
+
+Smoke check: `curl http://localhost:4000/health` → `{"ok":true}`; browse to `http://localhost:5173/login`, log in as the demo account, see three monitors with live updates (`check:completed` socket events).
+
+### 17.6 Manually triggering a check (without waiting for the 10-min cycle)
+
+Useful for verifying logs, transitions, or socket emissions on demand. Drop this into `apps/api/.trigger-check.mjs` (gitignored or just delete after use):
+
+```js
+import { PrismaClient } from '@prisma/client';
+import { Queue } from 'bullmq';
+
+const prisma = new PrismaClient();
+const monitor = await prisma.monitor.findFirst({ where: { name: 'Example' } });
+const queue = new Queue('checks', { connection: { url: process.env.REDIS_URL } });
+await queue.add('check', { monitorId: monitor.id });
+console.log('queued', monitor.id);
+await queue.close();
+await prisma.$disconnect();
+```
+
+Run: `node --env-file=.env .trigger-check.mjs`. Watch the API log; expect a `check completed` line within a second.
+
+### 17.7 Dependency drift from §3
+
+The frontend pin list in §3 is out of date — `apps/web/package.json` is authoritative for the web. Notable bumps:
+
+- `vite`: §3 said `^5.4.0`, now `^8.0.13` (accepted §15.10 deviation; see Day 10 note).
 - `@vitejs/plugin-react`: §3 said `^4.3.0`, now `^6.0.2`.
 - `recharts ^2.15.4` and `socket.io-client ^4.8.x` were added for Days 10 and 11.
 
 API pins still match §3's majors; only patch/minor numbers have drifted.
 
-### Process notes
+### 17.8 User tooling on hand (for Day 13)
 
-- Branching follows `CONTRIBUTING.md`: short-lived `feature/*`, `fix/*`, `chore/*`, `docs/*` branches, fast-forward (or rebase-then-FF) merges, Conventional Commit messages, no direct commits to `main`.
-- `npm install` is the only way to change dependencies — never hand-edit `package.json`'s deps block.
-- No git remote is configured; no PRs have been opened. Adding `origin` and pushing is your call.
-- Codex (OpenAI's CLI) was used to implement Days 5–12 in a single uninterrupted session while Claude was rate-limited. Those commits were cherry-picked onto current `main` and verified end-to-end.
+The user has the following installed and ready when Day 13 starts:
 
-### What's left, in order
+- **Render CLI** (`render`) — for service introspection.
+- **Render MCP** — Claude can provision services, list deployments, query Postgres, update env vars, and tail logs via `mcp__render__*` tools when loaded.
+- **Vercel CLI with Claude Code plugin** — for the frontend deploy.
 
-1. **Day 13 deploy.** Needs accounts you provision: Neon Postgres, Upstash or Render Key Value (Redis), Resend (with a verified sending domain), Render Web Service (instance count = **1**, see §4 / §17), Vercel for the frontend. Run `npx prisma db seed` against the prod DB once.
+The user does **not** have a Neon / Upstash / Resend account on file at the time of writing — those need provisioning. Don't assume Render Postgres or Render Key Value either; ask which the user wants.
+
+### 17.9 Known small gaps (not blocking v1.0.0, but visible to a careful reader)
+
+- **§16.11 per-monitor email rate limit (1 alert/min/monitor) is not implemented.** The 2-failure debounce mostly handles flap. Worth adding before tagging v1.0.0 — single-file change in `apps/api/src/services/alertEmail.ts` plus a test in `tests/statusTransition.test.ts` or a new `tests/alertEmail.test.ts`.
+- **Demo seed's Cloudflare URL trips `BODY_TOO_LARGE`** because Cloudflare's homepage is over 1 MB. Working as designed (proves the body cap), but a "Cloudflare: unknown" cell in the dashboard looks like a bug at first glance. Swap for `https://www.google.com/generate_204` or `https://httpbin.org/get` before tagging v1.0.0.
+- **`seed.ts` writes `intervalMinutes: 10` directly via Prisma** to bypass the route zod schema's `1|5|15|30|60` literal union. Schema is `Int` so it's accepted at the DB level; BullMQ honors the raw value. Don't try to "fix" this without coordinating with §6.
+- **Web has no automated tests yet.** §10 explicitly skips frontend snapshot tests for MVP. If Day 14 polish ever circles back to add Vitest + RTL, the suite would belong in `apps/web/tests/`.
+- **No per-check log assertion in tests.** The §15.4 `check completed` log line lives in the processor but no test asserts on it; adding a pino transport spy in `tests/checkProcessor.test.ts` would close that.
+
+### 17.10 What's left, in order
+
+1. **Day 13 deploy.** Needs accounts the user provisions: Neon Postgres (or Render Postgres), Upstash / Render Key Value (Redis), Resend (with a verified sending domain), Render Web Service (instance count = **1**, see §4), Vercel for the frontend. Build/Start/Pre-Deploy commands per §15.7. Run `npx prisma db seed` against the prod DB once after migrations apply.
 2. **README screenshots + live URL** — once the Vercel domain exists.
-3. **Tag `v1.0.0`** — once the prod smoke test passes (signup, add monitor, watch a real check + email alert).
+3. **Tag `v1.0.0`** — once the prod smoke test passes (signup as a new non-demo user, add a monitor against `https://example.com`, watch a real check fire and a real email alert land on a deliberately-down monitor).
 
-Optional pre-tag polish: swap Cloudflare in `prisma/seed.ts` for a smaller-body URL so the demo doesn't show a `BODY_TOO_LARGE` classification at first glance.
+Optional pre-tag polish: §17.9's small-gap list.
 
 ---
 
