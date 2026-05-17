@@ -39,6 +39,18 @@ export async function processCheckJob(job: Job<CheckJobData, void, typeof CHECK_
     checkedAt,
   });
 
+  // One structured log line per check completion — plan §15.4.
+  // Use the four fields the plan specifies; downstream tooling greps on these.
+  log.info(
+    {
+      monitorId: monitor.id,
+      status: result.status,
+      latencyMs: result.latencyMs,
+      error: result.error,
+    },
+    'check completed',
+  );
+
   if (transition.alert) {
     try {
       await sendAlertEmail(transition.alert);
