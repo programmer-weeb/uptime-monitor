@@ -2,9 +2,21 @@ import { createApp } from './app.js';
 import { env } from './config/env.js';
 import { log } from './config/log.js';
 import { prisma } from './config/prisma.js';
-import { closeChecksQueue, scheduleRetentionJob } from './jobs/queue.js';
+import { closeChecksQueue, scheduleMonitorCheck, scheduleRetentionJob } from './jobs/queue.js';
 import { createCheckWorker } from './jobs/checkProcessor.js';
 import { createRealtimeServer } from './realtime/socket.js';
+
+async function scheduleExistingMonitors(): Promise<void> {
+  // Per plan §15.6: on worker startup, upsert a scheduler for every
+  // un-paused monitor so fresh deploys and Redis flushes don't leave
+  // monitors stuck without a schedule. Idempotent — upsert replaces.
+  const monitors = await prisma.monitor.findMany({
+    where: { isPaused: false },
+    select: { id: true, intervalMinutes: true, isPaused: true },
+  });
+  await Promise.all(monitors.map(scheduleMonitorCheck));
+  log.info({ count: monitors.length }, 'existing monitors scheduled');
+}
 
 async function main() {
   const shouldRunApi = env.APP_MODE === 'all' || env.APP_MODE === 'api';
@@ -21,6 +33,7 @@ async function main() {
 
   if (worker) {
     await scheduleRetentionJob();
+    await scheduleExistingMonitors();
     log.info({ mode: env.APP_MODE }, 'check worker started');
   }
 
