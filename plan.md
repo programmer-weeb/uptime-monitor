@@ -612,8 +612,13 @@ Each day below is a focused evening (~2–3 hours). Adjust the calendar to your 
 
 ### Week 2 — Real-time, alerts, frontend, deploy
 
-- [ ] **Day 8 — Frontend scaffold + auth.**
+- [x] **Day 8 — Frontend scaffold + auth.** ✅ Done.
   Vite + React + TS + Tailwind + TanStack Query. Login and Signup pages, auth context, store JWT in `localStorage`. Protected route wrapper. Dashboard page is empty for now.
+  - **Implementation notes (deviations from plan):**
+    - Vite's react-ts template ships with React 19 / Vite 8 / TS 6 / ESLint 10 / `@types/node` 24. Reset `package.json` to bare scripts and reinstalled all deps via `npm install` at the pinned majors (React 18.3, Vite 5.4, TS 5.9, Tailwind 3.4, TanStack Query 5.100, React Router 6.30, `@types/node` 20.x). The Vite-generated `eslint.config.js` referenced `reactHooks.configs.flat.recommended` which doesn't exist in `eslint-plugin-react-hooks` v5; rewrote it to use `tseslint.config(...)` with `configs['recommended-latest']`.
+    - `tsconfig.app.json` (Vite default) is kept with its `verbatimModuleSyntax` and `erasableSyntaxOnly` flags; added `strict: true` + `noUncheckedIndexedAccess: true` per §16.1.
+    - `useAuth` was split out of `auth.tsx` into `useAuth.ts` (and the context object into `auth-context.ts`) so `react-refresh/only-export-components` stays clean — provider and hook can't live in the same file under Fast Refresh.
+    - End-to-end signup→dashboard flow wasn't exercised because the local API isn't running (no Postgres/Redis spun up on this worktree). Build, lint, and dev-server boot were verified; `curl http://localhost:5173/login` returns the bootstrapped HTML.
 
 - [ ] **Day 9 — Monitor list & create.**
   Dashboard fetches `/api/monitors`, renders a table with name, URL, current status, last latency. "Add monitor" modal with form. Optimistic updates via TanStack Query.
