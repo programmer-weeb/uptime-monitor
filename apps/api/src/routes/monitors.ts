@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { prisma } from '../config/prisma.js';
 import { ApiError } from '../lib/errors.js';
 import { urlGuard } from '../lib/urlGuard.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireNonDemo } from '../middleware/auth.js';
 import { createMonitorLimiter } from '../middleware/rateLimit.js';
 import { validate } from '../middleware/validate.js';
 import { removeMonitorSchedule, scheduleMonitorCheck } from '../jobs/queue.js';
@@ -66,6 +66,7 @@ monitorsRouter.get('/', async (req: Request, res: Response) => {
 
 monitorsRouter.post(
   '/',
+  requireNonDemo,
   createMonitorLimiter,
   validate(createMonitorSchema),
   async (req: Request, res: Response) => {
@@ -199,6 +200,7 @@ monitorsRouter.get(
 
 monitorsRouter.patch(
   '/:id',
+  requireNonDemo,
   validate(monitorIdParamsSchema, 'params'),
   validate(patchMonitorSchema),
   async (req: Request, res: Response) => {
@@ -232,6 +234,7 @@ monitorsRouter.patch(
 
 monitorsRouter.delete(
   '/:id',
+  requireNonDemo,
   validate(monitorIdParamsSchema, 'params'),
   async (req: Request, res: Response) => {
     const id = paramId(req);

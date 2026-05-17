@@ -51,3 +51,11 @@ export const requireAuth: RequestHandler = async (
     next(err);
   }
 };
+
+export const requireNonDemo: RequestHandler = (req, _res, next) => {
+  if (req.user?.isDemo) {
+    next(new ApiError('FORBIDDEN', 'Demo accounts can browse but not edit'));
+    return;
+  }
+  next();
+};

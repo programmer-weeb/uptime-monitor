@@ -570,3 +570,62 @@ describe('DELETE /api/monitors/:id', () => {
     expect(removeMonitorScheduleMock).not.toHaveBeenCalled();
   });
 });
+
+describe('demo account write-gate', () => {
+  async function demoUser() {
+    const user = await createUser({ isDemo: true });
+    return { user, token: signToken(user.id) };
+  }
+
+  it('rejects POST /api/monitors with 403 FORBIDDEN', async () => {
+    const { token } = await demoUser();
+    const res = await request(app)
+      .post('/api/monitors')
+      .set(...bearer(token))
+      .send({ name: 'demo write', url: 'https://example.com', intervalMinutes: 5 });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('FORBIDDEN');
+    expect(res.body.message).toMatch(/demo/i);
+    expect(scheduleMonitorCheckMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects PATCH /api/monitors/:id with 403', async () => {
+    const { user, token } = await demoUser();
+    const m = await createMonitor({ userId: user.id });
+    const res = await request(app)
+      .patch(`/api/monitors/${m.id}`)
+      .set(...bearer(token))
+      .send({ name: 'renamed' });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('FORBIDDEN');
+
+    const unchanged = await prisma.monitor.findUnique({ where: { id: m.id } });
+    expect(unchanged?.name).toBe(m.name);
+  });
+
+  it('rejects DELETE /api/monitors/:id with 403', async () => {
+    const { user, token } = await demoUser();
+    const m = await createMonitor({ userId: user.id });
+    const res = await request(app).delete(`/api/monitors/${m.id}`).set(...bearer(token));
+
+    expect(res.status).toBe(403);
+    const still = await prisma.monitor.findUnique({ where: { id: m.id } });
+    expect(still).not.toBeNull();
+    expect(removeMonitorScheduleMock).not.toHaveBeenCalled();
+  });
+
+  it('still allows GET /api/monitors and GET /:id for demo users', async () => {
+    const { user, token } = await demoUser();
+    await createMonitor({ userId: user.id, name: 'demo-monitor' });
+
+    const list = await request(app).get('/api/monitors').set(...bearer(token));
+    expect(list.status).toBe(200);
+    expect(list.body).toHaveLength(1);
+
+    const single = await request(app).get(`/api/monitors/${list.body[0].id}`).set(...bearer(token));
+    expect(single.status).toBe(200);
+    expect(single.body.name).toBe('demo-monitor');
+  });
+});
