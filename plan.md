@@ -668,7 +668,7 @@ Each day below is a focused evening (~2–3 hours). Adjust the calendar to your 
     - Added `socket.io-client` to the web app via npm and a protected-route live update subscriber that patches monitor and recent-check caches, then invalidates stats for the affected monitor.
     - API tests assert worker emissions without requiring a live Socket.IO server.
 
-- [ ] **Day 12 — Email alerts.**
+- [x] **Day 12 — Email alerts.** ✅ Done.
   After a check, in `statusTransition.ts`:
   - **All DB writes for one check go in a single `prisma.$transaction`**: insert the `Check` row, update `Monitor.consecutiveFailures` + `lastCheckedAt` + (if transitioning) `currentStatus`, and insert the `AlertEvent` row if an alert is owed. If anything throws, the whole check is rolled back — no half-updated state, no double-counted failures.
   - Transition rules:
@@ -679,6 +679,12 @@ Each day below is a focused evening (~2–3 hours). Adjust the calendar to your 
   - Insert one `AlertEvent` row per alert so "no duplicate alerts" is a SQL query, not vibes.
 
   Tests: simulate a flaky URL pattern and assert that exactly one `down` alert fires; assert that a DB failure mid-transition leaves zero rows changed (no orphan AlertEvent).
+  - **Implementation notes (deviations from plan):**
+    - Added `statusTransition.ts` to insert the check, update monitor status/failure counters, and insert alert events inside one Prisma transaction.
+    - Down alerts fire only when a monitor reaches two consecutive failures; later down checks do not duplicate the alert event.
+    - Recovery alerts fire when a monitor previously marked down returns up.
+    - Resend email sending happens after the transaction commits; failures are logged and do not roll back check/status writes.
+    - Tests cover debounced down alerts, recovery alerts, and rollback of check/status/alert writes when the transaction fails.
 
 - [ ] **Day 13 — Deploy.**
   - Neon Postgres free database, copy the `DATABASE_URL`.
