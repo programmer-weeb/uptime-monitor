@@ -2,7 +2,7 @@ import { createApp } from './app.js';
 import { env } from './config/env.js';
 import { log } from './config/log.js';
 import { prisma } from './config/prisma.js';
-import { closeChecksQueue } from './jobs/queue.js';
+import { closeChecksQueue, scheduleRetentionJob } from './jobs/queue.js';
 import { createCheckWorker } from './jobs/checkProcessor.js';
 
 async function main() {
@@ -16,6 +16,7 @@ async function main() {
   const worker = shouldRunWorker ? createCheckWorker() : null;
 
   if (worker) {
+    await scheduleRetentionJob();
     log.info({ mode: env.APP_MODE }, 'check worker started');
   }
 

@@ -3,11 +3,10 @@ import { prisma } from '../config/prisma.js';
 import { redisConnection } from '../config/redis.js';
 import { log } from '../config/log.js';
 import { runCheck } from '../services/checkRunner.js';
-import type { CheckJobData } from './queue.js';
+import { CHECK_JOB_NAME, CHECKS_QUEUE_NAME, RETENTION_JOB_NAME, type CheckJobData, type ChecksQueueJobData, type ChecksQueueJobName } from './queue.js';
+import { pruneOldChecks } from './retention.js';
 
-const CHECKS_QUEUE_NAME = 'checks';
-
-export async function processCheckJob(job: Job<CheckJobData, void, 'check'>): Promise<void> {
+export async function processCheckJob(job: Job<CheckJobData, void, typeof CHECK_JOB_NAME>): Promise<void> {
   const monitor = await prisma.monitor.findUnique({
     where: { id: job.data.monitorId },
   });
@@ -45,10 +44,22 @@ export async function processCheckJob(job: Job<CheckJobData, void, 'check'>): Pr
   });
 }
 
-export function createCheckWorker(): Worker<CheckJobData, void, 'check'> {
-  const worker = new Worker<CheckJobData, void, 'check'>(
+export async function processChecksQueueJob(
+  job: Job<ChecksQueueJobData, void, ChecksQueueJobName>,
+): Promise<void> {
+  if (job.name === RETENTION_JOB_NAME) {
+    const deletedCount = await pruneOldChecks();
+    log.info({ deletedCount }, 'old checks pruned');
+    return;
+  }
+
+  await processCheckJob(job as Job<CheckJobData, void, typeof CHECK_JOB_NAME>);
+}
+
+export function createCheckWorker(): Worker<ChecksQueueJobData, void, ChecksQueueJobName> {
+  const worker = new Worker<ChecksQueueJobData, void, ChecksQueueJobName>(
     CHECKS_QUEUE_NAME,
-    processCheckJob,
+    processChecksQueueJob,
     {
       connection: redisConnection,
       concurrency: 5,
@@ -60,7 +71,8 @@ export function createCheckWorker(): Worker<CheckJobData, void, 'check'> {
       {
         err: error,
         jobId: job?.id,
-        monitorId: job?.data.monitorId,
+        jobName: job?.name,
+        monitorId: job?.name === CHECK_JOB_NAME ? job.data.monitorId : undefined,
       },
       'check job failed',
     );

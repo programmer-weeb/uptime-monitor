@@ -3,18 +3,25 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { prisma } from './helpers.js';
 import { createMonitor, createUser } from './factories.js';
 import { runCheck } from '../src/services/checkRunner.js';
-import { processCheckJob } from '../src/jobs/checkProcessor.js';
-import type { CheckJobData } from '../src/jobs/queue.js';
+import { processCheckJob, processChecksQueueJob } from '../src/jobs/checkProcessor.js';
+import { pruneOldChecks } from '../src/jobs/retention.js';
+import type { CheckJobData, ChecksQueueJobData, ChecksQueueJobName } from '../src/jobs/queue.js';
 
 vi.mock('../src/services/checkRunner.js', () => ({
   runCheck: vi.fn(),
 }));
 
+vi.mock('../src/jobs/retention.js', () => ({
+  pruneOldChecks: vi.fn(),
+}));
+
 const CHECK_JOB_NAME = 'check';
 const runCheckMock = vi.mocked(runCheck);
+const pruneOldChecksMock = vi.mocked(pruneOldChecks);
 
 beforeEach(() => {
   runCheckMock.mockReset();
+  pruneOldChecksMock.mockReset();
 });
 
 function checkJob(monitorId: string): Job<CheckJobData, void, typeof CHECK_JOB_NAME> {
@@ -22,6 +29,13 @@ function checkJob(monitorId: string): Job<CheckJobData, void, typeof CHECK_JOB_N
     name: CHECK_JOB_NAME,
     data: { monitorId },
   } as Job<CheckJobData, void, typeof CHECK_JOB_NAME>;
+}
+
+function queueJob(name: ChecksQueueJobName): Job<ChecksQueueJobData, void, ChecksQueueJobName> {
+  return {
+    name,
+    data: name === CHECK_JOB_NAME ? { monitorId: 'unused' } : {},
+  } as Job<ChecksQueueJobData, void, ChecksQueueJobName>;
 }
 
 describe('processCheckJob', () => {
@@ -106,5 +120,16 @@ describe('processCheckJob', () => {
 
     expect(runCheckMock).not.toHaveBeenCalled();
     expect(await prisma.check.count()).toBe(0);
+  });
+});
+
+describe('processChecksQueueJob', () => {
+  it('runs the retention processor for prune-checks jobs', async () => {
+    pruneOldChecksMock.mockResolvedValueOnce(2);
+
+    await processChecksQueueJob(queueJob('prune-checks'));
+
+    expect(pruneOldChecksMock).toHaveBeenCalledTimes(1);
+    expect(runCheckMock).not.toHaveBeenCalled();
   });
 });
