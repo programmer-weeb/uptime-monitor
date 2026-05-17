@@ -1101,7 +1101,7 @@ Build in this order. Each box must be true before moving on.
 - [x] Prisma schema applied to dev DB (`prisma migrate dev --name init`). `prisma generate` runs clean.
 - [x] Auth working end-to-end: signup → token → `/me` returns user. Tests pass.
 - [x] Monitor CRUD working, owner-scoped. `urlGuard` rejects all CIDRs in §15.3 (tests prove it). Rate limit enforced.
-- [ ] `runCheck` returns the exact `CheckResult` shape from §6 for: success, timeout, DNS failure, 5xx, redirect to internal IP (BLOCKED), 2MB body (BODY_TOO_LARGE). *(Partial: success, BLOCKED, BODY_TOO_LARGE, UA tested; TIMEOUT/DNS/4xx/5xx tests still to write.)*
+- [x] `runCheck` returns the exact `CheckResult` shape from §6 for: success, timeout, DNS failure, 5xx, redirect to internal IP (BLOCKED), 2MB body (BODY_TOO_LARGE).
 - [x] BullMQ scheduler upserts jobs on create/edit, removes on pause/delete. Worker writes checks. Tested with `https://example.com`.
 - [x] Stats endpoint returns the shape from §6 for seeded data. Retention job deletes >30-day checks.
 - [x] Frontend boots, login/signup work, dashboard lists monitors, detail page shows chart.
