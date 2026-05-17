@@ -589,7 +589,7 @@ Each day below is a focused evening (~2–3 hours). Adjust the calendar to your 
     - The "DNS resolves to 169.254.169.254" test mocks `dns.promises.lookup` rather than relying on `metadata.google.internal` resolving on the test host (it doesn't on most dev machines). The real CIDR-match logic still runs against the mocked address.
     - `403 FORBIDDEN` (demo writes) is **not** enforced yet — that lands on Day 14 alongside the seeded demo account. Routes are otherwise complete.
 
-- [ ] **Day 4 — Check runner.**
+- [x] **Day 4 — Check runner.** ✅ Done.
   Pure function: `runCheck(url): Promise<CheckResult>`. Uses Node's built-in `fetch`. Times the request, catches errors, classifies them (`TIMEOUT`, `DNS`, `4xx`, `5xx`, `NETWORK`).
 
   Protocol decisions — make these explicit, don't accept defaults:
@@ -600,6 +600,12 @@ Each day below is a focused evening (~2–3 hours). Adjust the calendar to your 
   - **User-Agent:** `UptimeMonitor/1.0 (+https://your-site)`. The default fetch UA gets blocked by Cloudflare/WAFs and you'll waste an evening chasing fake "down" alerts.
 
   Unit-tested with `msw` or a local test server. Add tests specifically for: redirect to internal IP is rejected; >1MB body is truncated, not OOM; UA header is sent.
+  - **Implementation notes (deviations from plan):**
+    - Implemented `runCheck` in `src/services/checkRunner.ts` using built-in `fetch`, `GET`, `redirect: 'manual'`, `AbortSignal.timeout(10_000)`, and a fixed `User-Agent`.
+    - Redirects are followed for at most 3 hops, and `urlGuard` is rerun before every fetch hop, including redirected URLs.
+    - Response bodies are streamed and capped at 1 MB. Oversized responses are canceled and classified as `BODY_TOO_LARGE`.
+    - Error classes align with the API contract in §6: `TIMEOUT`, `DNS`, `CONNECTION`, `TLS`, `HTTP_4XX`, `HTTP_5XX`, `REDIRECT_LOOP`, `BLOCKED`, and `BODY_TOO_LARGE`.
+    - Tests cover success, blocked redirect target, body cap behavior, and the explicit User-Agent header.
 
 - [ ] **Day 5 — Queue & scheduling.**
   Install BullMQ (≥ v5). Create a `checks` queue. When a monitor is created/updated, call `queue.upsertJobScheduler(monitorId, { every: intervalMinutes * 60_000 }, { name: 'check', data: { monitorId } })` — the *upsert* semantics mean re-running on edit replaces the old schedule cleanly (no duplicate jobs). When a monitor is paused/deleted, call `queue.removeJobScheduler(monitorId)`. Worker calls `runCheck`, inserts a `Check` row, updates `Monitor.lastCheckedAt` and `currentStatus`. (Day 12 wraps these writes in a `$transaction` and adds the alert path; for now, a naive insert+update is fine.) Test the worker by running it against a known-good URL (`https://example.com`).
@@ -618,10 +624,15 @@ Each day below is a focused evening (~2–3 hours). Adjust the calendar to your 
     - Vite's react-ts template ships with React 19 / Vite 8 / TS 6 / ESLint 10 / `@types/node` 24. Reset `package.json` to bare scripts and reinstalled all deps via `npm install` at the pinned majors (React 18.3, Vite 5.4, TS 5.9, Tailwind 3.4, TanStack Query 5.100, React Router 6.30, `@types/node` 20.x). The Vite-generated `eslint.config.js` referenced `reactHooks.configs.flat.recommended` which doesn't exist in `eslint-plugin-react-hooks` v5; rewrote it to use `tseslint.config(...)` with `configs['recommended-latest']`.
     - `tsconfig.app.json` (Vite default) is kept with its `verbatimModuleSyntax` and `erasableSyntaxOnly` flags; added `strict: true` + `noUncheckedIndexedAccess: true` per §16.1.
     - `useAuth` was split out of `auth.tsx` into `useAuth.ts` (and the context object into `auth-context.ts`) so `react-refresh/only-export-components` stays clean — provider and hook can't live in the same file under Fast Refresh.
+    - Web validation runs as `npm --prefix apps/web run lint` and `npm --prefix apps/web run build`.
     - End-to-end signup→dashboard flow wasn't exercised because the local API isn't running (no Postgres/Redis spun up on this worktree). Build, lint, and dev-server boot were verified; `curl http://localhost:5173/login` returns the bootstrapped HTML.
 
-- [ ] **Day 9 — Monitor list & create.**
+- [x] **Day 9 — Monitor list & create.** ✅ Done.
   Dashboard fetches `/api/monitors`, renders a table with name, URL, current status, last latency. "Add monitor" modal with form. Optimistic updates via TanStack Query.
+  - **Implementation notes (deviations from plan):**
+    - Added `apps/web/src/api/monitors.ts` for monitor list/create calls and response types.
+    - Dashboard now renders a compact monitor table with status, interval, last checked, and latency fallbacks.
+    - Add Monitor uses a modal form and a TanStack Query mutation with optimistic cache insertion and invalidation.
 
 - [ ] **Day 10 — Monitor detail page.**
   Route `/monitors/:id`. Fetches monitor + stats + last 100 checks. Latency line chart (Recharts). Uptime % displayed prominently. Pause/resume toggle.
