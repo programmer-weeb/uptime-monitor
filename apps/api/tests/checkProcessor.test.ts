@@ -7,6 +7,7 @@ import { processCheckJob, processChecksQueueJob } from '../src/jobs/checkProcess
 import { pruneOldChecks } from '../src/jobs/retention.js';
 import type { CheckJobData, ChecksQueueJobData, ChecksQueueJobName } from '../src/jobs/queue.js';
 import { emitCheckCompleted, emitMonitorStatusChanged } from '../src/realtime/socket.js';
+import { sendAlertEmail } from '../src/services/alertEmail.js';
 
 vi.mock('../src/services/checkRunner.js', () => ({
   runCheck: vi.fn(),
@@ -25,17 +26,23 @@ vi.mock('../src/realtime/socket.js', async (importOriginal) => {
   };
 });
 
+vi.mock('../src/services/alertEmail.js', () => ({
+  sendAlertEmail: vi.fn().mockResolvedValue(undefined),
+}));
+
 const CHECK_JOB_NAME = 'check';
 const runCheckMock = vi.mocked(runCheck);
 const pruneOldChecksMock = vi.mocked(pruneOldChecks);
 const emitCheckCompletedMock = vi.mocked(emitCheckCompleted);
 const emitMonitorStatusChangedMock = vi.mocked(emitMonitorStatusChanged);
+const sendAlertEmailMock = vi.mocked(sendAlertEmail);
 
 beforeEach(() => {
   runCheckMock.mockReset();
   pruneOldChecksMock.mockReset();
   emitCheckCompletedMock.mockReset();
   emitMonitorStatusChangedMock.mockReset();
+  sendAlertEmailMock.mockReset();
 });
 
 function checkJob(monitorId: string): Job<CheckJobData, void, typeof CHECK_JOB_NAME> {
@@ -107,6 +114,13 @@ describe('processCheckJob', () => {
         currentStatus: 'up',
       }),
     });
+    expect(sendAlertEmailMock).toHaveBeenCalledTimes(1);
+    expect(sendAlertEmailMock).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'recovery',
+      to: user.email,
+      monitorName: monitor.name,
+      monitorUrl: monitor.url,
+    }));
   });
 
   it('writes a down check and increments consecutive failures', async () => {
@@ -142,6 +156,12 @@ describe('processCheckJob', () => {
     expect(updated.lastCheckedAt).toBeInstanceOf(Date);
     expect(emitCheckCompletedMock).toHaveBeenCalledTimes(1);
     expect(emitMonitorStatusChangedMock).toHaveBeenCalledTimes(1);
+    expect(sendAlertEmailMock).toHaveBeenCalledTimes(1);
+    expect(sendAlertEmailMock).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'down',
+      to: user.email,
+      error: 'HTTP_5XX',
+    }));
   });
 
   it('skips paused monitors', async () => {
@@ -154,6 +174,7 @@ describe('processCheckJob', () => {
     expect(await prisma.check.count({ where: { monitorId: monitor.id } })).toBe(0);
     expect(emitCheckCompletedMock).not.toHaveBeenCalled();
     expect(emitMonitorStatusChangedMock).not.toHaveBeenCalled();
+    expect(sendAlertEmailMock).not.toHaveBeenCalled();
   });
 
   it('skips missing monitors', async () => {
@@ -163,6 +184,7 @@ describe('processCheckJob', () => {
     expect(await prisma.check.count()).toBe(0);
     expect(emitCheckCompletedMock).not.toHaveBeenCalled();
     expect(emitMonitorStatusChangedMock).not.toHaveBeenCalled();
+    expect(sendAlertEmailMock).not.toHaveBeenCalled();
   });
 });
 

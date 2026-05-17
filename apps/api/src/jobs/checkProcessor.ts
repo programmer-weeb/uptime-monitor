@@ -3,6 +3,8 @@ import { prisma } from '../config/prisma.js';
 import { redisConnection } from '../config/redis.js';
 import { log } from '../config/log.js';
 import { runCheck } from '../services/checkRunner.js';
+import { sendAlertEmail } from '../services/alertEmail.js';
+import { recordCheckTransition } from '../services/statusTransition.js';
 import { CHECK_JOB_NAME, CHECKS_QUEUE_NAME, RETENTION_JOB_NAME, type CheckJobData, type ChecksQueueJobData, type ChecksQueueJobName } from './queue.js';
 import { pruneOldChecks } from './retention.js';
 import {
@@ -15,6 +17,13 @@ import {
 export async function processCheckJob(job: Job<CheckJobData, void, typeof CHECK_JOB_NAME>): Promise<void> {
   const monitor = await prisma.monitor.findUnique({
     where: { id: job.data.monitorId },
+    include: {
+      user: {
+        select: {
+          email: true,
+        },
+      },
+    },
   });
 
   if (!monitor || monitor.isPaused) {
@@ -24,42 +33,31 @@ export async function processCheckJob(job: Job<CheckJobData, void, typeof CHECK_
   const result = await runCheck(monitor.url);
   const checkedAt = new Date();
 
-  const check = await prisma.check.create({
-    data: {
-      monitorId: monitor.id,
-      status: result.status,
-      statusCode: result.statusCode,
-      latencyMs: result.latencyMs,
-      error: result.error,
-      checkedAt,
-    },
+  const transition = await recordCheckTransition({
+    monitor,
+    result,
+    checkedAt,
   });
 
-  const updatedMonitor = await prisma.monitor.update({
-    where: { id: monitor.id },
-    data: {
-      currentStatus: result.status,
-      lastCheckedAt: checkedAt,
-      consecutiveFailures:
-        result.status === 'down'
-          ? {
-              increment: 1,
-            }
-        : 0,
-    },
-  });
+  if (transition.alert) {
+    try {
+      await sendAlertEmail(transition.alert);
+    } catch (err) {
+      log.error({ err, monitorId: monitor.id, alertType: transition.alert.type }, 'alert email failed');
+    }
+  }
 
-  const realtimeMonitor = toRealtimeMonitor(updatedMonitor);
+  const realtimeMonitor = toRealtimeMonitor(transition.monitor);
   emitCheckCompleted(monitor.userId, {
     monitor: realtimeMonitor,
-    check: toRealtimeCheck(check),
+    check: toRealtimeCheck(transition.check),
   });
 
-  if (monitor.currentStatus !== updatedMonitor.currentStatus) {
+  if (monitor.currentStatus !== transition.monitor.currentStatus) {
     emitMonitorStatusChanged(monitor.userId, {
       monitorId: monitor.id,
       previousStatus: monitor.currentStatus,
-      currentStatus: updatedMonitor.currentStatus,
+      currentStatus: transition.monitor.currentStatus,
       monitor: realtimeMonitor,
     });
   }
