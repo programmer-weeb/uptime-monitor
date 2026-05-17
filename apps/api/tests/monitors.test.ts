@@ -5,9 +5,17 @@ import { createApp } from '../src/app.js';
 import { prisma } from './helpers.js';
 import { createUser, createMonitor } from './factories.js';
 import { signToken } from '../src/lib/jwt.js';
+import { removeMonitorSchedule, scheduleMonitorCheck } from '../src/jobs/queue.js';
 import './helpers.js';
 
+vi.mock('../src/jobs/queue.js', () => ({
+  scheduleMonitorCheck: vi.fn().mockResolvedValue(undefined),
+  removeMonitorSchedule: vi.fn().mockResolvedValue(undefined),
+}));
+
 const app = createApp();
+const scheduleMonitorCheckMock = vi.mocked(scheduleMonitorCheck);
+const removeMonitorScheduleMock = vi.mocked(removeMonitorSchedule);
 
 const bearer = (token: string): [string, string] => ['Authorization', `Bearer ${token}`];
 
@@ -15,6 +23,11 @@ async function authedUser() {
   const user = await createUser();
   return { user, token: signToken(user.id) };
 }
+
+beforeEach(() => {
+  scheduleMonitorCheckMock.mockClear();
+  removeMonitorScheduleMock.mockClear();
+});
 
 describe('GET /api/monitors', () => {
   it('returns 401 without a token', async () => {
@@ -64,6 +77,13 @@ describe('POST /api/monitors', () => {
     expect(res.body.createdAt).toEqual(expect.any(String));
     expect(res.body).not.toHaveProperty('consecutiveFailures');
     expect(res.body).not.toHaveProperty('userId');
+    expect(scheduleMonitorCheckMock).toHaveBeenCalledTimes(1);
+    expect(scheduleMonitorCheckMock).toHaveBeenCalledWith(expect.objectContaining({
+      id: res.body.id,
+      intervalMinutes: 5,
+      isPaused: false,
+    }));
+    expect(removeMonitorScheduleMock).not.toHaveBeenCalled();
   });
 
   it('rejects unknown fields (strict schema)', async () => {
@@ -196,6 +216,7 @@ describe('POST /api/monitors', () => {
       .send({ name: 'eleventh', url: 'https://example.com', intervalMinutes: 5 });
     expect(res.status).toBe(409);
     expect(res.body.error).toBe('MONITOR_LIMIT_REACHED');
+    expect(scheduleMonitorCheckMock).not.toHaveBeenCalled();
 
     // Confirms the cap is per-user — a second user can still create.
     const { token: otherToken } = await authedUser();
@@ -204,6 +225,12 @@ describe('POST /api/monitors', () => {
       .set(...bearer(otherToken))
       .send({ name: 'fresh', url: 'https://example.com', intervalMinutes: 5 });
     expect(okRes.status).toBe(201);
+    expect(scheduleMonitorCheckMock).toHaveBeenCalledTimes(1);
+    expect(scheduleMonitorCheckMock).toHaveBeenCalledWith(expect.objectContaining({
+      id: okRes.body.id,
+      intervalMinutes: 5,
+      isPaused: false,
+    }));
   });
 
   it('mounts the per-user rate limiter (drops draft-7 RateLimit headers)', async () => {
@@ -263,6 +290,13 @@ describe('PATCH /api/monitors/:id', () => {
       intervalMinutes: 30,
       isPaused: true,
     });
+    expect(scheduleMonitorCheckMock).toHaveBeenCalledTimes(1);
+    expect(scheduleMonitorCheckMock).toHaveBeenCalledWith(expect.objectContaining({
+      id: m.id,
+      intervalMinutes: 30,
+      isPaused: true,
+    }));
+    expect(removeMonitorScheduleMock).not.toHaveBeenCalled();
   });
 
   it('rejects an empty body (at least one field required)', async () => {
@@ -297,6 +331,19 @@ describe('PATCH /api/monitors/:id', () => {
     // And the original row must be unchanged.
     const reloaded = await prisma.monitor.findUnique({ where: { id: m.id } });
     expect(reloaded?.isPaused).toBe(false);
+    expect(scheduleMonitorCheckMock).not.toHaveBeenCalled();
+    expect(removeMonitorScheduleMock).not.toHaveBeenCalled();
+  });
+
+  it('does not schedule when the monitor is not found', async () => {
+    const { token } = await authedUser();
+    const res = await request(app)
+      .patch('/api/monitors/does-not-exist')
+      .set(...bearer(token))
+      .send({ isPaused: true });
+    expect(res.status).toBe(404);
+    expect(scheduleMonitorCheckMock).not.toHaveBeenCalled();
+    expect(removeMonitorScheduleMock).not.toHaveBeenCalled();
   });
 });
 
@@ -308,6 +355,9 @@ describe('DELETE /api/monitors/:id', () => {
     const delRes = await request(app).delete(`/api/monitors/${m.id}`).set(...bearer(token));
     expect(delRes.status).toBe(204);
     expect(delRes.body).toEqual({});
+    expect(removeMonitorScheduleMock).toHaveBeenCalledTimes(1);
+    expect(removeMonitorScheduleMock).toHaveBeenCalledWith(m.id);
+    expect(scheduleMonitorCheckMock).not.toHaveBeenCalled();
 
     const getRes = await request(app).get(`/api/monitors/${m.id}`).set(...bearer(token));
     expect(getRes.status).toBe(404);
@@ -322,5 +372,15 @@ describe('DELETE /api/monitors/:id', () => {
 
     const still = await prisma.monitor.findUnique({ where: { id: m.id } });
     expect(still).not.toBeNull();
+    expect(scheduleMonitorCheckMock).not.toHaveBeenCalled();
+    expect(removeMonitorScheduleMock).not.toHaveBeenCalled();
+  });
+
+  it('does not remove the schedule when the monitor is not found', async () => {
+    const { token } = await authedUser();
+    const res = await request(app).delete('/api/monitors/does-not-exist').set(...bearer(token));
+    expect(res.status).toBe(404);
+    expect(scheduleMonitorCheckMock).not.toHaveBeenCalled();
+    expect(removeMonitorScheduleMock).not.toHaveBeenCalled();
   });
 });

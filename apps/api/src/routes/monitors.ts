@@ -5,6 +5,7 @@ import { urlGuard } from '../lib/urlGuard.js';
 import { requireAuth } from '../middleware/auth.js';
 import { createMonitorLimiter } from '../middleware/rateLimit.js';
 import { validate } from '../middleware/validate.js';
+import { removeMonitorSchedule, scheduleMonitorCheck } from '../jobs/queue.js';
 import {
   createMonitorSchema,
   patchMonitorSchema,
@@ -79,6 +80,7 @@ monitorsRouter.post(
       data: { userId, name, url, intervalMinutes },
       select: MONITOR_SELECT,
     });
+    await scheduleMonitorCheck(monitor);
     res.status(201).json(monitor);
   },
 );
@@ -126,6 +128,7 @@ monitorsRouter.patch(
       // Should be unreachable: we just updated the row inside the same request.
       throw new ApiError('NOT_FOUND', 'Monitor not found');
     }
+    await scheduleMonitorCheck(monitor);
     res.json(monitor);
   },
 );
@@ -134,12 +137,14 @@ monitorsRouter.delete(
   '/:id',
   validate(monitorIdParamsSchema, 'params'),
   async (req: Request, res: Response) => {
+    const id = paramId(req);
     const result = await prisma.monitor.deleteMany({
-      where: { id: paramId(req), userId: req.user!.id },
+      where: { id, userId: req.user!.id },
     });
     if (result.count === 0) {
       throw new ApiError('NOT_FOUND', 'Monitor not found');
     }
+    await removeMonitorSchedule(id);
     res.status(204).end();
   },
 );
