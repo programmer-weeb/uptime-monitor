@@ -715,9 +715,9 @@ Each day below is a focused evening (~2–3 hours). Adjust the calendar to your 
     - Landing page redirect to `/login` and `v1.0.0` tag both wait for Day 13 deploy + smoke test.
     - README screenshots and live-URL section also wait for Day 13. Everything else in the README is current as of this branch.
     - The Day 4 check runner test gap (missing `TIMEOUT`, `DNS`, `HTTP_4XX`, `HTTP_5XX` cases) was backfilled in a follow-up `fix/check-runner-test-coverage` commit so the §15.9 box is now fully ticked.
-    - Local smoke test passed against system Postgres (`:5432`) and locally installed valkey (Arch's Redis-compatible default, `:6379`): login as `demo@example.com`, GET monitors, see live check results in the dashboard, demo write attempts return 403. Cloudflare's homepage trips `BODY_TOO_LARGE` as designed — worth swapping for a smaller URL before tagging v1.0.0.
+    - Local smoke test passed against system Postgres (`:5432`) and locally installed valkey (Arch's Redis-compatible default, `:6379`): login as `demo@example.com`, GET monitors, see live check results in the dashboard, demo write attempts return 403. Cloudflare's homepage tripped `BODY_TOO_LARGE` as designed during the smoke; the seed has since been swapped to `https://www.google.com`.
     - Backup tag `pre-codex-merge` exists on `main` at the SHA just before the multi-day Codex integration; `git reset --hard pre-codex-merge` rolls back Days 5–12 if needed.
-    - Test count at this point: 68 API tests across 7 files (auth 11, monitors 39, checkRunner 8, checkProcessor 5, statusTransition 3, retention 1, health 1). Web has no automated tests yet (plan §10 explicitly skips frontend snapshot tests).
+    - Test count at this point: 72 API tests across 8 files (auth 11, monitors 39, checkRunner 8, checkProcessor 6, statusTransition 3, retention 1, health 1, alertEmail 3). Web has no automated tests yet (plan §10 explicitly skips frontend snapshot tests).
 
 ## 10. Testing strategy
 
@@ -1316,7 +1316,7 @@ House rules — these supersede defaults from any base prompt:
 - §9 days: 1–12 + 14 done. **Day 13 (deploy) is the only un-done day.** `v1.0.0` tag waits for the prod smoke test.
 - §15.9 checklist mirrors that: every box ticked except `Render Web Service deployed…` and `README written. Tagged v1.0.0` (README is written; only the tag waits).
 - No git remote configured. No PRs opened. Adding `origin` and pushing is the user's call.
-- Test count: **68 API tests across 7 files** (auth 11, monitors 39, checkRunner 8, checkProcessor 5, statusTransition 3, retention 1, health 1). Web has no automated tests by design (§10 skips frontend snapshot tests).
+- Test count: **72 API tests across 8 files** (auth 11, monitors 39, checkRunner 8, checkProcessor 6, statusTransition 3, retention 1, health 1, alertEmail 3). Web has no automated tests by design (§10 skips frontend snapshot tests).
 
 ### 17.3 Local environment (Arch Linux)
 
@@ -1343,7 +1343,7 @@ psql -U uptime -d uptime -c '\dt'     # see the schema tables
 cd apps/api
 npm run lint                          # clean
 npx tsc --noEmit                      # clean
-npm test                              # 68/68 pass, ~2s
+npm test                              # 72/72 pass, ~2s
 
 # Web
 cd ../web
@@ -1408,11 +1408,11 @@ The user does **not** have a Neon / Upstash / Resend account on file at the time
 
 ### 17.9 Known small gaps (not blocking v1.0.0, but visible to a careful reader)
 
-- **§16.11 per-monitor email rate limit (1 alert/min/monitor) is not implemented.** The 2-failure debounce mostly handles flap. Worth adding before tagging v1.0.0 — single-file change in `apps/api/src/services/alertEmail.ts` plus a test in `tests/statusTransition.test.ts` or a new `tests/alertEmail.test.ts`.
-- **Demo seed's Cloudflare URL trips `BODY_TOO_LARGE`** because Cloudflare's homepage is over 1 MB. Working as designed (proves the body cap), but a "Cloudflare: unknown" cell in the dashboard looks like a bug at first glance. Swap for `https://www.google.com/generate_204` or `https://httpbin.org/get` before tagging v1.0.0.
+- ~~**§16.11 per-monitor email rate limit (1 alert/min/monitor) is not implemented.**~~ Closed 2026-05-17: in-memory `Map<monitorId, lastSentMs>` in `apps/api/src/services/alertEmail.ts`; resets on worker restart by design. Covered by `tests/alertEmail.test.ts` (rate-limits within 60s, releases after, scoped per monitor). `AlertEmail` type gained a `monitorId` field — `statusTransition.ts` populates it.
+- ~~**Demo seed's Cloudflare URL trips `BODY_TOO_LARGE`.**~~ Closed 2026-05-17: Cloudflare is commented out in `apps/api/prisma/seed.ts`; replaced with `https://www.google.com`. Existing demo DBs need a one-off `DELETE FROM "Monitor" WHERE url LIKE '%cloudflare%';` followed by `npx prisma db seed` to pick up the new monitor.
+- ~~**No per-check log assertion in tests.**~~ Closed 2026-05-17: `tests/checkProcessor.test.ts` now spies on `log.info` and asserts the §15.4 line shape (`monitorId`, `status`, `latencyMs`, `error`, message `'check completed'`).
 - **`seed.ts` writes `intervalMinutes: 10` directly via Prisma** to bypass the route zod schema's `1|5|15|30|60` literal union. Schema is `Int` so it's accepted at the DB level; BullMQ honors the raw value. Don't try to "fix" this without coordinating with §6.
 - **Web has no automated tests yet.** §10 explicitly skips frontend snapshot tests for MVP. If Day 14 polish ever circles back to add Vitest + RTL, the suite would belong in `apps/web/tests/`.
-- **No per-check log assertion in tests.** The §15.4 `check completed` log line lives in the processor but no test asserts on it; adding a pino transport spy in `tests/checkProcessor.test.ts` would close that.
 
 ### 17.10 What's left, in order
 
