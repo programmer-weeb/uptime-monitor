@@ -607,8 +607,15 @@ Each day below is a focused evening (~2–3 hours). Adjust the calendar to your 
     - Error classes align with the API contract in §6: `TIMEOUT`, `DNS`, `CONNECTION`, `TLS`, `HTTP_4XX`, `HTTP_5XX`, `REDIRECT_LOOP`, `BLOCKED`, and `BODY_TOO_LARGE`.
     - Tests cover success, blocked redirect target, body cap behavior, and the explicit User-Agent header.
 
-- [ ] **Day 5 — Queue & scheduling.**
+- [x] **Day 5 — Queue & scheduling.** ✅ Done.
   Install BullMQ (≥ v5). Create a `checks` queue. When a monitor is created/updated, call `queue.upsertJobScheduler(monitorId, { every: intervalMinutes * 60_000 }, { name: 'check', data: { monitorId } })` — the *upsert* semantics mean re-running on edit replaces the old schedule cleanly (no duplicate jobs). When a monitor is paused/deleted, call `queue.removeJobScheduler(monitorId)`. Worker calls `runCheck`, inserts a `Check` row, updates `Monitor.lastCheckedAt` and `currentStatus`. (Day 12 wraps these writes in a `$transaction` and adds the alert path; for now, a naive insert+update is fine.) Test the worker by running it against a known-good URL (`https://example.com`).
+  - **Implementation notes (deviations from plan):**
+    - BullMQ and ioredis were already installed; no package changes were needed.
+    - Added a lazy `checks` queue in `src/jobs/queue.ts` so importing the API app in tests does not open a Redis connection until scheduling actually runs.
+    - Monitor create/update calls `scheduleMonitorCheck(...)`; pause updates remove the scheduler through that helper; deletes call `removeMonitorSchedule(...)` only after the owner-scoped delete succeeds.
+    - Added `processCheckJob(...)` in `src/jobs/checkProcessor.ts`: it skips missing/paused monitors, runs `runCheck`, writes a `checks` row, updates `currentStatus` and `lastCheckedAt`, increments `consecutiveFailures` on down, and resets failures on up.
+    - `server.ts` now honors `APP_MODE=all|api|worker`: `all` runs the API and worker in one process for the MVP, `api` runs HTTP only, and `worker` runs only the BullMQ processor.
+    - Tests mock the queue for route-level scheduling assertions and test the processor directly without requiring Redis.
 
 - [ ] **Day 6 — Stats endpoint + retention job.**
   `GET /api/monitors/:id/stats` — Prisma `groupBy` (or `$queryRaw` for a single-pass version) over the last 24h of checks: uptime percentage, average latency, last-down timestamp. Add a daily BullMQ repeatable job that runs `prisma.check.deleteMany({ where: { checkedAt: { lt: cutoff } } })` to prune checks older than 30 days. Tests with seeded check data.
