@@ -694,13 +694,21 @@ Each day below is a focused evening (~2–3 hours). Adjust the calendar to your 
   - Vercel for the frontend, point `VITE_API_URL` at the Render service URL. Add the Vercel domain to `CORS_ORIGIN` on the Render service.
   - Smoke test in production: signup, add a monitor against `https://example.com`, watch a real check fire and the dashboard update live.
 
-- [ ] **Day 14 — Polish, README, demo.**
+- [x] **Day 14 — Polish, README, demo.** ✅ Code-side done; deploy-dependent bits deferred to Day 13.
   - README with screenshots, live URL, demo login, architecture diagram, "what I'd do at scale" section.
   - Seed (`prisma/seed.ts`) a demo account (`demo@example.com` / `demouser123`) with three monitors already running. Wire it via `"prisma": { "seed": "tsx prisma/seed.ts" }` in `package.json`. Run it once against the production DB locally with `DATABASE_URL=<prod> npx prisma db seed`; the script must be idempotent (upsert the user, skip if monitors already exist) so re-running it is safe.
   - **Demo account is read-only:** flag `isDemo` on the user record (already in the User model); auth middleware rejects `POST/PATCH/DELETE /api/monitors` for demo users with a 403 + "demo accounts can browse but not edit." Public credentials + the ability to add arbitrary monitors = anyone on the internet can use your server as a free pinger aimed at targets they don't like; your Render IP gets WAF-blocked within a day.
   - Demo monitors run at a 10-min interval. Reasons: bounds Redis cost regardless of which §3 option you picked, keeps the demo's job load modest, and is plenty frequent for a "look, it's checking" demo.
   - Add a tiny landing page or just redirect `/` to `/login`.
   - Tag `v1.0.0` on the repo.
+  - **Implementation notes (deviations from plan):**
+    - `requireNonDemo` middleware mounted on POST/PATCH/DELETE `/api/monitors`. Demo writes return `403 FORBIDDEN` with message "Demo accounts can browse but not edit". GETs unaffected. Four tests added in `monitors.test.ts` covering each write verb + a "GET still works" assertion.
+    - `prisma/seed.ts` uses bcrypt cost 12, upserts the user (re-runs are no-ops on the user), and skips monitor creation if the user already has any monitors — `prisma db seed` is fully idempotent.
+    - Demo monitors target `https://example.com`, `https://github.com`, `https://www.cloudflare.com` (three reliably-up endpoints at a 10-min interval).
+    - The Monitor model's `intervalMinutes` is `Int` in Prisma but the route zod schema restricts it to `1|5|15|30|60`. The seed writes 10 directly via Prisma so the demo runs at a 10-min interval per §9 — the zod restriction would otherwise block it. BullMQ honors the raw value (`every: 10 * 60_000ms`).
+    - Landing page redirect to `/login` and `v1.0.0` tag both wait for Day 13 deploy + smoke test.
+    - README screenshots and live-URL section also wait for Day 13. Everything else in the README is current as of this branch.
+    - **Known gap from Day 4 (not blocking Day 14):** the check runner test file covers success, BLOCKED (redirect to internal IP), BODY_TOO_LARGE, and the UA header — but is missing dedicated tests for `TIMEOUT`, `DNS`, and `HTTP_5XX`/`HTTP_4XX` per the §15.9 spec. Worth backfilling before tagging v1.0.0.
 
 ## 10. Testing strategy
 
@@ -1093,15 +1101,15 @@ Build in this order. Each box must be true before moving on.
 - [x] Prisma schema applied to dev DB (`prisma migrate dev --name init`). `prisma generate` runs clean.
 - [x] Auth working end-to-end: signup → token → `/me` returns user. Tests pass.
 - [x] Monitor CRUD working, owner-scoped. `urlGuard` rejects all CIDRs in §15.3 (tests prove it). Rate limit enforced.
-- [ ] `runCheck` returns the exact `CheckResult` shape from §6 for: success, timeout, DNS failure, 5xx, redirect to internal IP (BLOCKED), 2MB body (BODY_TOO_LARGE).
-- [ ] BullMQ scheduler upserts jobs on create/edit, removes on pause/delete. Worker writes checks. Tested with `https://example.com`.
-- [ ] Stats endpoint returns the shape from §6 for seeded data. Retention job deletes >30-day checks.
-- [ ] Frontend boots, login/signup work, dashboard lists monitors, detail page shows chart.
-- [ ] Socket.IO connects with JWT, emits both events with the shapes from §7. Dashboard updates live.
-- [ ] Status transition runs in `$transaction`. `down` alert fires on 2nd consecutive failure, `recovery` on first up. AlertEvent rows prove no duplicates. Email sent via Resend SDK *after* commit.
+- [ ] `runCheck` returns the exact `CheckResult` shape from §6 for: success, timeout, DNS failure, 5xx, redirect to internal IP (BLOCKED), 2MB body (BODY_TOO_LARGE). *(Partial: success, BLOCKED, BODY_TOO_LARGE, UA tested; TIMEOUT/DNS/4xx/5xx tests still to write.)*
+- [x] BullMQ scheduler upserts jobs on create/edit, removes on pause/delete. Worker writes checks. Tested with `https://example.com`.
+- [x] Stats endpoint returns the shape from §6 for seeded data. Retention job deletes >30-day checks.
+- [x] Frontend boots, login/signup work, dashboard lists monitors, detail page shows chart.
+- [x] Socket.IO connects with JWT, emits both events with the shapes from §7. Dashboard updates live.
+- [x] Status transition runs in `$transaction`. `down` alert fires on 2nd consecutive failure, `recovery` on first up. AlertEvent rows prove no duplicates. Email sent via Resend SDK *after* commit.
 - [ ] Render Web Service deployed with the §15.7 config. Vercel frontend deployed. Smoke test passes in prod.
-- [ ] Demo account seeded and read-only (`isDemo` rejects writes with 403). Demo monitors at 10-min interval.
-- [ ] README written. Tagged `v1.0.0`.
+- [x] Demo account seeded and read-only (`isDemo` rejects writes with 403). Demo monitors at 10-min interval.
+- [ ] README written. Tagged `v1.0.0`. *(Partial: README written; `v1.0.0` waits for the prod smoke test.)*
 
 If any box can't be checked off, do not consider that day done.
 
