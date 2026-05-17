@@ -6,6 +6,7 @@ import { runCheck } from '../src/services/checkRunner.js';
 import { processCheckJob, processChecksQueueJob } from '../src/jobs/checkProcessor.js';
 import { pruneOldChecks } from '../src/jobs/retention.js';
 import type { CheckJobData, ChecksQueueJobData, ChecksQueueJobName } from '../src/jobs/queue.js';
+import { emitCheckCompleted, emitMonitorStatusChanged } from '../src/realtime/socket.js';
 
 vi.mock('../src/services/checkRunner.js', () => ({
   runCheck: vi.fn(),
@@ -15,13 +16,26 @@ vi.mock('../src/jobs/retention.js', () => ({
   pruneOldChecks: vi.fn(),
 }));
 
+vi.mock('../src/realtime/socket.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/realtime/socket.js')>();
+  return {
+    ...actual,
+    emitCheckCompleted: vi.fn(),
+    emitMonitorStatusChanged: vi.fn(),
+  };
+});
+
 const CHECK_JOB_NAME = 'check';
 const runCheckMock = vi.mocked(runCheck);
 const pruneOldChecksMock = vi.mocked(pruneOldChecks);
+const emitCheckCompletedMock = vi.mocked(emitCheckCompleted);
+const emitMonitorStatusChangedMock = vi.mocked(emitMonitorStatusChanged);
 
 beforeEach(() => {
   runCheckMock.mockReset();
   pruneOldChecksMock.mockReset();
+  emitCheckCompletedMock.mockReset();
+  emitMonitorStatusChangedMock.mockReset();
 });
 
 function checkJob(monitorId: string): Job<CheckJobData, void, typeof CHECK_JOB_NAME> {
@@ -70,6 +84,29 @@ describe('processCheckJob', () => {
     expect(updated.currentStatus).toBe('up');
     expect(updated.consecutiveFailures).toBe(0);
     expect(updated.lastCheckedAt).toBeInstanceOf(Date);
+    expect(emitCheckCompletedMock).toHaveBeenCalledTimes(1);
+    expect(emitCheckCompletedMock).toHaveBeenCalledWith(user.id, {
+      monitor: expect.objectContaining({
+        id: monitor.id,
+        currentStatus: 'up',
+        lastCheckedAt: expect.any(String),
+      }),
+      check: expect.objectContaining({
+        monitorId: monitor.id,
+        status: 'up',
+        checkedAt: expect.any(String),
+      }),
+    });
+    expect(emitMonitorStatusChangedMock).toHaveBeenCalledTimes(1);
+    expect(emitMonitorStatusChangedMock).toHaveBeenCalledWith(user.id, {
+      monitorId: monitor.id,
+      previousStatus: 'down',
+      currentStatus: 'up',
+      monitor: expect.objectContaining({
+        id: monitor.id,
+        currentStatus: 'up',
+      }),
+    });
   });
 
   it('writes a down check and increments consecutive failures', async () => {
@@ -103,6 +140,8 @@ describe('processCheckJob', () => {
     expect(updated.currentStatus).toBe('down');
     expect(updated.consecutiveFailures).toBe(2);
     expect(updated.lastCheckedAt).toBeInstanceOf(Date);
+    expect(emitCheckCompletedMock).toHaveBeenCalledTimes(1);
+    expect(emitMonitorStatusChangedMock).toHaveBeenCalledTimes(1);
   });
 
   it('skips paused monitors', async () => {
@@ -113,6 +152,8 @@ describe('processCheckJob', () => {
 
     expect(runCheckMock).not.toHaveBeenCalled();
     expect(await prisma.check.count({ where: { monitorId: monitor.id } })).toBe(0);
+    expect(emitCheckCompletedMock).not.toHaveBeenCalled();
+    expect(emitMonitorStatusChangedMock).not.toHaveBeenCalled();
   });
 
   it('skips missing monitors', async () => {
@@ -120,6 +161,8 @@ describe('processCheckJob', () => {
 
     expect(runCheckMock).not.toHaveBeenCalled();
     expect(await prisma.check.count()).toBe(0);
+    expect(emitCheckCompletedMock).not.toHaveBeenCalled();
+    expect(emitMonitorStatusChangedMock).not.toHaveBeenCalled();
   });
 });
 

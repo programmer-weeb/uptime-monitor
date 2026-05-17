@@ -5,6 +5,12 @@ import { log } from '../config/log.js';
 import { runCheck } from '../services/checkRunner.js';
 import { CHECK_JOB_NAME, CHECKS_QUEUE_NAME, RETENTION_JOB_NAME, type CheckJobData, type ChecksQueueJobData, type ChecksQueueJobName } from './queue.js';
 import { pruneOldChecks } from './retention.js';
+import {
+  emitCheckCompleted,
+  emitMonitorStatusChanged,
+  toRealtimeCheck,
+  toRealtimeMonitor,
+} from '../realtime/socket.js';
 
 export async function processCheckJob(job: Job<CheckJobData, void, typeof CHECK_JOB_NAME>): Promise<void> {
   const monitor = await prisma.monitor.findUnique({
@@ -18,7 +24,7 @@ export async function processCheckJob(job: Job<CheckJobData, void, typeof CHECK_
   const result = await runCheck(monitor.url);
   const checkedAt = new Date();
 
-  await prisma.check.create({
+  const check = await prisma.check.create({
     data: {
       monitorId: monitor.id,
       status: result.status,
@@ -29,7 +35,7 @@ export async function processCheckJob(job: Job<CheckJobData, void, typeof CHECK_
     },
   });
 
-  await prisma.monitor.update({
+  const updatedMonitor = await prisma.monitor.update({
     where: { id: monitor.id },
     data: {
       currentStatus: result.status,
@@ -39,9 +45,24 @@ export async function processCheckJob(job: Job<CheckJobData, void, typeof CHECK_
           ? {
               increment: 1,
             }
-          : 0,
+        : 0,
     },
   });
+
+  const realtimeMonitor = toRealtimeMonitor(updatedMonitor);
+  emitCheckCompleted(monitor.userId, {
+    monitor: realtimeMonitor,
+    check: toRealtimeCheck(check),
+  });
+
+  if (monitor.currentStatus !== updatedMonitor.currentStatus) {
+    emitMonitorStatusChanged(monitor.userId, {
+      monitorId: monitor.id,
+      previousStatus: monitor.currentStatus,
+      currentStatus: updatedMonitor.currentStatus,
+      monitor: realtimeMonitor,
+    });
+  }
 }
 
 export async function processChecksQueueJob(

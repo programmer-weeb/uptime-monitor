@@ -4,6 +4,7 @@ import { log } from './config/log.js';
 import { prisma } from './config/prisma.js';
 import { closeChecksQueue, scheduleRetentionJob } from './jobs/queue.js';
 import { createCheckWorker } from './jobs/checkProcessor.js';
+import { createRealtimeServer } from './realtime/socket.js';
 
 async function main() {
   const shouldRunApi = env.APP_MODE === 'all' || env.APP_MODE === 'api';
@@ -13,6 +14,9 @@ async function main() {
   const server = app?.listen(env.PORT, () => {
     log.info({ port: env.PORT, mode: env.APP_MODE, nodeEnv: env.NODE_ENV }, 'api listening');
   });
+  if (server) {
+    createRealtimeServer(server);
+  }
   const worker = shouldRunWorker ? createCheckWorker() : null;
 
   if (worker) {
