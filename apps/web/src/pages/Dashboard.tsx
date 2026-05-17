@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import {
   createMonitor,
@@ -175,7 +176,12 @@ function MonitorTable({ monitors }: { monitors: Monitor[] }) {
           {monitors.map((monitor) => (
             <tr key={monitor.id} className="align-top">
               <td className="px-4 py-3">
-                <div className="font-medium text-gray-900">{monitor.name}</div>
+                <Link
+                  to={`/monitors/${monitor.id}`}
+                  className="font-medium text-blue-700 hover:underline"
+                >
+                  {monitor.name}
+                </Link>
                 <div className="text-xs text-gray-500">{monitor.intervalMinutes} min interval</div>
               </td>
               <td className="px-4 py-3">
