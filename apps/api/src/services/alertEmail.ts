@@ -5,7 +5,24 @@ import type { AlertEmail } from './statusTransition.js';
 
 let resend: Resend | null = null;
 
+// Per plan §16.11: backstop on top of the 2-failure debounce. A flapping
+// monitor that bounces up/down inside a minute could otherwise spam alerts.
+// In-memory by design — Resend has no per-monitor rate-limit primitive and
+// this is a single-instance worker (§4); resets on restart, which is fine.
+const RATE_LIMIT_MS = 60_000;
+const lastSentAtByMonitor = new Map<string, number>();
+
 export async function sendAlertEmail(alert: AlertEmail): Promise<void> {
+  const now = Date.now();
+  const last = lastSentAtByMonitor.get(alert.monitorId);
+  if (last !== undefined && now - last < RATE_LIMIT_MS) {
+    log.warn(
+      { monitorId: alert.monitorId, alertType: alert.type, msSinceLast: now - last },
+      'alert email rate-limited',
+    );
+    return;
+  }
+
   if (!env.RESEND_API_KEY || !env.EMAIL_FROM) {
     log.warn({ alertType: alert.type, to: alert.to }, 'alert email skipped; email env missing');
     return;
@@ -18,6 +35,11 @@ export async function sendAlertEmail(alert: AlertEmail): Promise<void> {
     subject: subjectFor(alert),
     html: htmlFor(alert),
   });
+  lastSentAtByMonitor.set(alert.monitorId, now);
+}
+
+export function _resetAlertEmailRateLimitForTests(): void {
+  lastSentAtByMonitor.clear();
 }
 
 function subjectFor(alert: AlertEmail): string {

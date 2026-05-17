@@ -6,6 +6,7 @@ type DbClient = Prisma.TransactionClient;
 
 export type AlertEmail = {
   type: AlertType;
+  monitorId: string;
   to: string;
   monitorName: string;
   monitorUrl: string;
@@ -98,6 +99,7 @@ export async function writeCheckTransition(
     monitor: updatedMonitor,
     alert: {
       type: alertType,
+      monitorId: monitor.id,
       to: monitor.user.email,
       monitorName: monitor.name,
       monitorUrl: monitor.url,

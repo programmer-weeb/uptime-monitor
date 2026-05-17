@@ -12,7 +12,8 @@ const DEMO_BCRYPT_COST = 12;
 const DEMO_MONITORS: Array<{ name: string; url: string }> = [
   { name: 'Example', url: 'https://example.com' },
   { name: 'GitHub', url: 'https://github.com' },
-  { name: 'Cloudflare', url: 'https://www.cloudflare.com' },
+  // { name: 'Cloudflare', url: 'https://www.cloudflare.com' },
+  { name: 'Google', url: 'https://www.google.com' },
 ];
 
 async function main() {
