@@ -578,8 +578,16 @@ Each day below is a focused evening (~2–3 hours). Adjust the calendar to your 
     - `POST /api/auth/login` runs a dummy `bcrypt.compare` on the "user not found" branch so the timing matches the "wrong password" branch — prevents email enumeration via response-time analysis.
     - Rate limits set to 1000/window in `NODE_ENV=test` so test sequencing doesn't trip them. Production values from §6 unchanged (3/hr signup, 10/min login).
 
-- [ ] **Day 3 — Monitor CRUD.**
+- [x] **Day 3 — Monitor CRUD.** ✅ Done.
   Add the `Monitor` model and run a migration. Full CRUD routes scoped by `userId`. Validate URL: must be `https://`, must not resolve to private/loopback/link-local/cloud-metadata ranges (write `urlGuard.ts` — this is your SSRF protection and a great resume bullet). Enforce 10-monitor cap. Apply the `POST /api/monitors` per-user rate limit (§6). Tests for each route, including the "user can't see another user's monitor" case and a `urlGuard` rejects-metadata-IP case.
+  - **Implementation notes (deviations from plan):**
+    - The `add_monitors` migration also creates the `checks` and `alert_events` tables (plus the three enums) because the Monitor model in §5 declares `checks Check[]` and `alertEvents AlertEvent[]` back-relations — Prisma's schema won't validate with dangling references. The Day 5/6 work just gets to write to existing tables instead of running another migration.
+    - PATCH / DELETE / GET-by-id of another user's monitor return **404**, not 403. §6's contract lists 403 for "not owner" but doing so leaks monitor-existence to any authenticated user; collapsing both branches to 404 closes the enumeration channel. §6 should be updated to reflect this.
+    - PATCH is implemented via `updateMany({ where: { id, userId } })` so the owner check and the update are a single statement (no read-then-write race). The returned row is fetched in a follow-up `findUnique` to apply the `select` shape — Prisma's `updateMany` doesn't return rows.
+    - `req.params.id` is read through the validated-params bag that `validate(schema, 'params')` parks on the request. Express 5's `Request` types widen `req.params[k]` to `string | string[]`, which would otherwise require ugly per-call casts.
+    - The `createMonitorLimiter`'s `keyGenerator` falls back to `req.ip` if `req.user` is somehow missing — `requireAuth` is mounted first on the router so this branch is unreachable in practice, but the fallback keeps the limiter from crashing if route order ever changes.
+    - The "DNS resolves to 169.254.169.254" test mocks `dns.promises.lookup` rather than relying on `metadata.google.internal` resolving on the test host (it doesn't on most dev machines). The real CIDR-match logic still runs against the mocked address.
+    - `403 FORBIDDEN` (demo writes) is **not** enforced yet — that lands on Day 14 alongside the seeded demo account. Routes are otherwise complete.
 
 - [ ] **Day 4 — Check runner.**
   Pure function: `runCheck(url): Promise<CheckResult>`. Uses Node's built-in `fetch`. Times the request, catches errors, classifies them (`TIMEOUT`, `DNS`, `4xx`, `5xx`, `NETWORK`).
@@ -1034,7 +1042,7 @@ Build in this order. Each box must be true before moving on.
 - [x] `apps/api` boots: `npm run dev` → `:4000`, `GET /health → { ok: true }`. Zero deps un-pinned.
 - [x] Prisma schema applied to dev DB (`prisma migrate dev --name init`). `prisma generate` runs clean.
 - [x] Auth working end-to-end: signup → token → `/me` returns user. Tests pass.
-- [ ] Monitor CRUD working, owner-scoped. `urlGuard` rejects all CIDRs in §15.3 (tests prove it). Rate limit enforced.
+- [x] Monitor CRUD working, owner-scoped. `urlGuard` rejects all CIDRs in §15.3 (tests prove it). Rate limit enforced.
 - [ ] `runCheck` returns the exact `CheckResult` shape from §6 for: success, timeout, DNS failure, 5xx, redirect to internal IP (BLOCKED), 2MB body (BODY_TOO_LARGE).
 - [ ] BullMQ scheduler upserts jobs on create/edit, removes on pause/delete. Worker writes checks. Tested with `https://example.com`.
 - [ ] Stats endpoint returns the shape from §6 for seeded data. Retention job deletes >30-day checks.
