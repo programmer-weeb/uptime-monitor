@@ -617,8 +617,15 @@ Each day below is a focused evening (~2–3 hours). Adjust the calendar to your 
     - `server.ts` now honors `APP_MODE=all|api|worker`: `all` runs the API and worker in one process for the MVP, `api` runs HTTP only, and `worker` runs only the BullMQ processor.
     - Tests mock the queue for route-level scheduling assertions and test the processor directly without requiring Redis.
 
-- [ ] **Day 6 — Stats endpoint + retention job.**
+- [x] **Day 6 — Stats endpoint + retention job.** ✅ Done.
   `GET /api/monitors/:id/stats` — Prisma `groupBy` (or `$queryRaw` for a single-pass version) over the last 24h of checks: uptime percentage, average latency, last-down timestamp. Add a daily BullMQ repeatable job that runs `prisma.check.deleteMany({ where: { checkedAt: { lt: cutoff } } })` to prune checks older than 30 days. Tests with seeded check data.
+  - **Implementation notes (deviations from plan):**
+    - Added `GET /api/monitors/:id/stats` as an owner-scoped route before `/:id`, preserving the existing 404 behavior for missing or cross-user monitors.
+    - Stats count only the last 24 hours: uptime is rounded to two decimals, average latency uses successful/up checks only, and `lastDownAt` is emitted as ISO UTC or `null`.
+    - Added `pruneOldChecks(now)` in `src/jobs/retention.ts`; it deletes checks strictly older than 30 days and returns the deleted count.
+    - Added a `prune-checks` BullMQ scheduler on the existing `checks` queue, scheduled once per 24 hours with a stable `checks-retention` scheduler id.
+    - The shared worker now dispatches both monitor check jobs and retention prune jobs; `server.ts` schedules retention when `APP_MODE=all|worker`.
+    - Tests cover stats calculations, auth scoping, old-check exclusion, retention cutoff behavior, and the worker dispatch path without requiring Redis.
 
 - [ ] **Day 7 — Catch up / clean up.**
   You will be behind. Use this day. Refactor anything ugly. Write README skeleton.
