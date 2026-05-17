@@ -373,6 +373,94 @@ describe('GET /api/monitors/:id/stats', () => {
   });
 });
 
+describe('GET /api/monitors/:id/checks', () => {
+  it('returns the owner-scoped recent checks newest first', async () => {
+    const { user, token } = await authedUser();
+    const m = await createMonitor({ userId: user.id });
+    const older = await createCheck({
+      monitorId: m.id,
+      status: 'down',
+      statusCode: 503,
+      latencyMs: 900,
+      error: '5xx',
+      checkedAt: new Date(Date.now() - 30_000),
+    });
+    const newer = await createCheck({
+      monitorId: m.id,
+      status: 'up',
+      statusCode: 200,
+      latencyMs: 120,
+      checkedAt: new Date(Date.now() - 10_000),
+    });
+
+    const res = await request(app).get(`/api/monitors/${m.id}/checks`).set(...bearer(token));
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(2);
+    expect(res.body[0]).toMatchObject({
+      id: newer.id,
+      status: 'up',
+      statusCode: 200,
+      latencyMs: 120,
+      error: null,
+      checkedAt: newer.checkedAt.toISOString(),
+    });
+    expect(res.body[1]).toMatchObject({
+      id: older.id,
+      status: 'down',
+      statusCode: 503,
+      latencyMs: 900,
+      error: '5xx',
+      checkedAt: older.checkedAt.toISOString(),
+    });
+  });
+
+  it('honors the limit query up to 100 checks', async () => {
+    const { user, token } = await authedUser();
+    const m = await createMonitor({ userId: user.id });
+    for (let i = 0; i < 3; i++) {
+      await createCheck({
+        monitorId: m.id,
+        latencyMs: 100 + i,
+        checkedAt: new Date(Date.now() - i * 1_000),
+      });
+    }
+
+    const res = await request(app)
+      .get(`/api/monitors/${m.id}/checks?limit=2`)
+      .set(...bearer(token));
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(2);
+    expect(res.body[0].latencyMs).toBe(100);
+    expect(res.body[1].latencyMs).toBe(101);
+  });
+
+  it('rejects invalid limits', async () => {
+    const { user, token } = await authedUser();
+    const m = await createMonitor({ userId: user.id });
+
+    const res = await request(app)
+      .get(`/api/monitors/${m.id}/checks?limit=101`)
+      .set(...bearer(token));
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('VALIDATION');
+  });
+
+  it("returns 404 for another user's monitor", async () => {
+    const { user: a } = await authedUser();
+    const { token: bToken } = await authedUser();
+    const m = await createMonitor({ userId: a.id });
+    await createCheck({ monitorId: m.id, status: 'up' });
+
+    const res = await request(app).get(`/api/monitors/${m.id}/checks`).set(...bearer(bToken));
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('NOT_FOUND');
+  });
+});
+
 describe('PATCH /api/monitors/:id', () => {
   it('updates name, intervalMinutes, and isPaused', async () => {
     const { user, token } = await authedUser();

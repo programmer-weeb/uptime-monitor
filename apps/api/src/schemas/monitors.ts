@@ -37,5 +37,12 @@ export const monitorIdParamsSchema = z
   })
   .strict();
 
+export const monitorChecksQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(100),
+  })
+  .strict();
+
 export type CreateMonitorInput = z.infer<typeof createMonitorSchema>;
 export type PatchMonitorInput = z.infer<typeof patchMonitorSchema>;
+export type MonitorChecksQuery = z.infer<typeof monitorChecksQuerySchema>;

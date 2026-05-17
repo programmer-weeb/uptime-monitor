@@ -10,7 +10,9 @@ import {
   createMonitorSchema,
   patchMonitorSchema,
   monitorIdParamsSchema,
+  monitorChecksQuerySchema,
   type CreateMonitorInput,
+  type MonitorChecksQuery,
   type PatchMonitorInput,
 } from '../schemas/monitors.js';
 
@@ -24,6 +26,14 @@ function paramId(req: Request): string {
     throw new ApiError('VALIDATION', 'Missing :id param');
   }
   return params.id;
+}
+
+function checksQuery(req: Request): MonitorChecksQuery {
+  const query = (req as unknown as { validatedQuery?: MonitorChecksQuery }).validatedQuery;
+  if (!query) {
+    throw new ApiError('VALIDATION', 'Missing checks query');
+  }
+  return query;
 }
 
 const MAX_MONITORS_PER_USER = 10;
@@ -131,6 +141,44 @@ monitorsRouter.get(
       lastDownAt: lastDownAt?.toISOString() ?? null,
       totalChecks24h,
     });
+  },
+);
+
+monitorsRouter.get(
+  '/:id/checks',
+  validate(monitorIdParamsSchema, 'params'),
+  validate(monitorChecksQuerySchema, 'query'),
+  async (req: Request, res: Response) => {
+    const id = paramId(req);
+    const { limit } = checksQuery(req);
+    const monitor = await prisma.monitor.findFirst({
+      where: { id, userId: req.user!.id },
+      select: { id: true },
+    });
+    if (!monitor) {
+      throw new ApiError('NOT_FOUND', 'Monitor not found');
+    }
+
+    const checks = await prisma.check.findMany({
+      where: { monitorId: id },
+      orderBy: { checkedAt: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        status: true,
+        statusCode: true,
+        latencyMs: true,
+        error: true,
+        checkedAt: true,
+      },
+    });
+
+    res.json(
+      checks.map((check) => ({
+        ...check,
+        checkedAt: check.checkedAt.toISOString(),
+      })),
+    );
   },
 );
 
