@@ -22,3 +22,12 @@ export const loginLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: isTest ? 1000 : 10,
 });
+
+// 5 monitor creations per minute per authenticated user (1000/min in tests).
+// Mounted only on POST /api/monitors; requireAuth runs first so req.user is set.
+export const createMonitorLimiter = rateLimit({
+  ...baseOpts,
+  windowMs: 60 * 1000,
+  limit: isTest ? 1000 : 5,
+  keyGenerator: (req) => req.user?.id ?? req.ip ?? 'anonymous',
+});

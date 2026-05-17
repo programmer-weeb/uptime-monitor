@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import { corsOrigins } from './config/env.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { authRouter } from './routes/auth.js';
+import { monitorsRouter } from './routes/monitors.js';
 
 export function createApp(): Express {
   const app = express();
@@ -19,6 +20,7 @@ export function createApp(): Express {
   });
 
   app.use('/api/auth', authRouter);
+  app.use('/api/monitors', monitorsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
