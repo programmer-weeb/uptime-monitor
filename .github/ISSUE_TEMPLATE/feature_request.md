@@ -8,7 +8,17 @@ labels: enhancement
 
 <!-- What user problem does this solve? -->
 
+## Area
+
+<!-- API, web, docs, CI, or other. -->
+
 ## Proposed solution
+
+## Acceptance criteria
+
+- <!-- criterion -->
+- <!-- criterion -->
+- <!-- criterion -->
 
 ## Alternatives considered
 
