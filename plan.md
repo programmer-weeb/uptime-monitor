@@ -577,6 +577,7 @@ Each day below is a focused evening (~2–3 hours). Adjust the calendar to your 
     - Bcrypt cost gated on `NODE_ENV`: 4 in tests, 12 in dev/prod (per §5 + §16.9).
     - `POST /api/auth/login` runs a dummy `bcrypt.compare` on the "user not found" branch so the timing matches the "wrong password" branch — prevents email enumeration via response-time analysis.
     - Rate limits set to 1000/window in `NODE_ENV=test` so test sequencing doesn't trip them. Production values from §6 unchanged (3/hr signup, 10/min login).
+    - Local Redis is **valkey** installed via `pacman -S redis` on Arch — the redis package is just a `redis.service → valkey.service` symlink. Wire-protocol compatible, `redis-cli ping` returns PONG. App code is unchanged.
 
 - [x] **Day 3 — Monitor CRUD.** ✅ Done.
   Add the `Monitor` model and run a migration. Full CRUD routes scoped by `userId`. Validate URL: must be `https://`, must not resolve to private/loopback/link-local/cloud-metadata ranges (write `urlGuard.ts` — this is your SSRF protection and a great resume bullet). Enforce 10-monitor cap. Apply the `POST /api/monitors` per-user rate limit (§6). Tests for each route, including the "user can't see another user's monitor" case and a `urlGuard` rejects-metadata-IP case.
@@ -659,6 +660,7 @@ Each day below is a focused evening (~2–3 hours). Adjust the calendar to your 
   - **Implementation notes (deviations from plan):**
     - Added `GET /api/monitors/:id/checks?limit=100` as an owner-scoped endpoint returning recent checks newest first with a validated 1-100 limit.
     - Installed Recharts via npm and added the protected `/monitors/:id` route.
+    - **Plan §15.10 deviation:** the same dep-bump commit also moved `vite` from `^5.4.x` (the §3 pin) to `^8.0.13`, and `@vitejs/plugin-react` from `^4.x` to `^6.0.2`. The bump was accepted because Vite 8 still builds clean and Recharts had to land regardless. §3's pin list should be considered superseded by `apps/web/package.json` for the frontend.
     - The detail page fetches monitor metadata, 24-hour stats, and recent checks, then renders prominent uptime metrics, a latency line chart, the latest checks table, and a pause/resume toggle.
     - Dashboard monitor names now link to their detail pages.
 
@@ -712,6 +714,8 @@ Each day below is a focused evening (~2–3 hours). Adjust the calendar to your 
     - README screenshots and live-URL section also wait for Day 13. Everything else in the README is current as of this branch.
     - The Day 4 check runner test gap (missing `TIMEOUT`, `DNS`, `HTTP_4XX`, `HTTP_5XX` cases) was backfilled in a follow-up `fix/check-runner-test-coverage` commit so the §15.9 box is now fully ticked.
     - Local smoke test passed against system Postgres (`:5432`) and locally installed valkey (Arch's Redis-compatible default, `:6379`): login as `demo@example.com`, GET monitors, see live check results in the dashboard, demo write attempts return 403. Cloudflare's homepage trips `BODY_TOO_LARGE` as designed — worth swapping for a smaller URL before tagging v1.0.0.
+    - Backup tag `pre-codex-merge` exists on `main` at the SHA just before the multi-day Codex integration; `git reset --hard pre-codex-merge` rolls back Days 5–12 if needed.
+    - Test count at this point: 68 API tests across 7 files (auth 11, monitors 39, checkRunner 8, checkProcessor 5, statusTransition 3, retention 1, health 1). Web has no automated tests yet (plan §10 explicitly skips frontend snapshot tests).
 
 ## 10. Testing strategy
 
@@ -1284,6 +1288,64 @@ Concrete rules the implementer should follow for each piece of the stack. Where 
 - All secrets via Render's "Environment" tab. Never commit a `.env` with prod values.
 - Auto-deploy on push to `main` is fine for a solo project. Add branch protection + required CI checks if a teammate joins.
 - Build log: check the first deploy carefully — Prisma generate has to succeed before start, or you'll get cryptic "cannot find module @prisma/client" at runtime.
+
+## 17. Session resumption notes
+
+If you are picking this up in a fresh session, read this first — it's the shortest path to "I know where things stand."
+
+### Where the code is
+
+- Single branch: `main`. All feature branches merged + deleted. Tag `pre-codex-merge` points at the SHA before Days 5–12 were integrated, in case you ever need to roll back.
+- §9 days: 1–12 + 14 done. **Day 13 (deploy) is the only un-done day.** v1.0.0 tag waits for the prod smoke test.
+- §15.9 checklist mirrors that: every box ticked except `Render Web Service deployed…` and `README written. Tagged v1.0.0` (README is written; only the tag waits).
+
+### Local environment as last left
+
+- **Postgres** — system service on `:5432`. Two DBs: `uptime` (dev) and `uptime_test` (Vitest pool). Both seeded with the schema in the latest migration.
+- **Redis** — installed via `pacman -S redis`, which on Arch is actually **valkey** (a Redis fork, wire-compatible). `systemctl is-active redis` → active because the package symlinks `redis.service → valkey.service`. App code uses the standard `redis://localhost:6379`.
+- **Demo data** — `npx prisma db seed` from `apps/api` upserts `demo@example.com / demouser123` (`isDemo=true`) and three monitors (Example, GitHub, Cloudflare) at a 10-min interval. Idempotent.
+- **`.env` files** — `apps/api/.env` and `apps/web/.env` both present, both gitignored. The repo only commits `.env.example` files.
+
+### Running it locally
+
+```bash
+# from apps/api (one shell)
+npm run dev               # API + worker on :4000 (APP_MODE=all)
+npm test                  # 68 tests across 7 files, ~2s
+npm run lint              # clean
+npx tsc --noEmit          # clean
+
+# from apps/web (another shell)
+npm run dev               # Vite on :5173
+npm run build             # lint + tsc -b + vite build, clean
+```
+
+Sanity checks: `curl http://localhost:4000/health` returns `{"ok":true}`; logging in as the demo account at `http://localhost:5173/login` shows the three seeded monitors with live updates.
+
+### Dependency drift from §3
+
+The frontend pin list in §3 is out of date — `apps/web/package.json` is authoritative:
+
+- `vite`: §3 said `^5.4.0`, now `^8.0.13` (accepted §15.10 deviation; see Day 10 deviation note).
+- `@vitejs/plugin-react`: §3 said `^4.3.0`, now `^6.0.2`.
+- `recharts ^2.15.4` and `socket.io-client ^4.8.x` were added for Days 10 and 11.
+
+API pins still match §3's majors; only patch/minor numbers have drifted.
+
+### Process notes
+
+- Branching follows `CONTRIBUTING.md`: short-lived `feature/*`, `fix/*`, `chore/*`, `docs/*` branches, fast-forward (or rebase-then-FF) merges, Conventional Commit messages, no direct commits to `main`.
+- `npm install` is the only way to change dependencies — never hand-edit `package.json`'s deps block.
+- No git remote is configured; no PRs have been opened. Adding `origin` and pushing is your call.
+- Codex (OpenAI's CLI) was used to implement Days 5–12 in a single uninterrupted session while Claude was rate-limited. Those commits were cherry-picked onto current `main` and verified end-to-end.
+
+### What's left, in order
+
+1. **Day 13 deploy.** Needs accounts you provision: Neon Postgres, Upstash or Render Key Value (Redis), Resend (with a verified sending domain), Render Web Service (instance count = **1**, see §4 / §17), Vercel for the frontend. Run `npx prisma db seed` against the prod DB once.
+2. **README screenshots + live URL** — once the Vercel domain exists.
+3. **Tag `v1.0.0`** — once the prod smoke test passes (signup, add monitor, watch a real check + email alert).
+
+Optional pre-tag polish: swap Cloudflare in `prisma/seed.ts` for a smaller-body URL so the demo doesn't show a `BODY_TOO_LARGE` classification at first glance.
 
 ---
 
