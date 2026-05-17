@@ -7,12 +7,77 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum MonitorStatus {
+  up
+  down
+  unknown
+}
+
+enum CheckStatus {
+  up
+  down
+}
+
+enum AlertType {
+  down
+  recovery
+}
+
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String   @map("password_hash")
-  isDemo       Boolean  @default(false) @map("is_demo")
-  createdAt    DateTime @default(now()) @map("created_at")
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  isDemo       Boolean   @default(false) @map("is_demo")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  monitors     Monitor[]
 
   @@map("users")
+}
+
+model Monitor {
+  id                  String        @id @default(cuid())
+  userId              String        @map("user_id")
+  name                String
+  url                 String
+  intervalMinutes     Int           @map("interval_minutes")
+  isPaused            Boolean       @default(false) @map("is_paused")
+  currentStatus       MonitorStatus @default(unknown) @map("current_status")
+  consecutiveFailures Int           @default(0) @map("consecutive_failures")
+  lastCheckedAt       DateTime?     @map("last_checked_at")
+  createdAt           DateTime      @default(now()) @map("created_at")
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  checks      Check[]
+  alertEvents AlertEvent[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("monitors")
+}
+
+model Check {
+  id         String      @id @default(cuid())
+  monitorId  String      @map("monitor_id")
+  status     CheckStatus
+  statusCode Int?        @map("status_code")
+  latencyMs  Int         @map("latency_ms")
+  error      String?
+  checkedAt  DateTime    @default(now()) @map("checked_at")
+
+  monitor Monitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+
+  @@index([monitorId, checkedAt(sort: Desc)])
+  @@index([checkedAt])
+  @@map("checks")
+}
+
+model AlertEvent {
+  id        String    @id @default(cuid())
+  monitorId String    @map("monitor_id")
+  type      AlertType
+  sentAt    DateTime  @default(now()) @map("sent_at")
+
+  monitor Monitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+
+  @@index([monitorId, sentAt(sort: Desc)])
+  @@map("alert_events")
 }
