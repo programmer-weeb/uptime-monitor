@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, Navigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import {
   Line,
   LineChart,
@@ -12,15 +12,19 @@ import {
 } from 'recharts';
 import { ApiError } from '../api/client';
 import {
+  deleteMonitor,
   getMonitor,
   getMonitorStats,
   listMonitorChecks,
   patchMonitor,
   type Monitor,
   type MonitorCheck,
+  type PatchMonitorInput,
 } from '../api/monitors';
 import { queryKeys } from '../api/queryKeys';
 import { useAuth } from '../lib/useAuth';
+import { EditMonitorModal } from '../components/EditMonitorModal';
+import { DeleteMonitorConfirmModal } from '../components/DeleteMonitorConfirmModal';
 
 const CHECK_LIMIT = 100;
 
@@ -29,6 +33,12 @@ export default function MonitorDetail() {
   const id = routeId ?? '';
   const { user, logout } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const monitorQuery = useQuery({
     queryKey: queryKeys.monitor(id),
@@ -53,6 +63,52 @@ export default function MonitorDetail() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.monitors() });
     },
   });
+
+  const editMutation = useMutation({
+    mutationFn: (patch: PatchMonitorInput) => patchMonitor(id, patch),
+    onSuccess: (monitor) => {
+      queryClient.setQueryData(queryKeys.monitor(id), monitor);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.monitors() });
+      // Stats may have moved (status reset on URL change zeros recent uptime calc).
+      void queryClient.invalidateQueries({ queryKey: queryKeys.monitorStats(id) });
+      setIsEditOpen(false);
+      setEditError(null);
+    },
+    onError: (err: unknown) => {
+      setEditError(messageFor(err, 'Could not update monitor.'));
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteMonitor(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.monitors() });
+      queryClient.removeQueries({ queryKey: queryKeys.monitor(id) });
+      navigate('/', { replace: true });
+    },
+    onError: (err: unknown) => {
+      setDeleteError(messageFor(err, 'Could not delete monitor.'));
+    },
+  });
+
+  function openEdit() {
+    setEditError(null);
+    setIsEditOpen(true);
+  }
+
+  function handleEditSubmit(patch: PatchMonitorInput) {
+    if (Object.keys(patch).length === 0) {
+      setIsEditOpen(false);
+      return;
+    }
+    setEditError(null);
+    editMutation.mutate(patch);
+  }
+
+  function openDelete() {
+    setDeleteError(null);
+    setIsDeleteOpen(true);
+  }
 
   const monitor = monitorQuery.data;
   const stats = statsQuery.data;
@@ -148,14 +204,32 @@ export default function MonitorDetail() {
                     {formatDateTime(monitor.lastCheckedAt)}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  disabled={user?.isDemo || togglePauseMutation.isPending}
-                  onClick={() => togglePauseMutation.mutate(!monitor.isPaused)}
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {monitor.isPaused ? 'Resume checks' : 'Pause checks'}
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={user?.isDemo || togglePauseMutation.isPending}
+                    onClick={() => togglePauseMutation.mutate(!monitor.isPaused)}
+                    className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {monitor.isPaused ? 'Resume checks' : 'Pause checks'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={user?.isDemo}
+                    onClick={openEdit}
+                    className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    disabled={user?.isDemo}
+                    onClick={openDelete}
+                    className="rounded-md border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
               {togglePauseMutation.isError && (
                 <p role="alert" className="mt-3 text-sm text-red-600">
@@ -223,11 +297,39 @@ export default function MonitorDetail() {
               </div>
               <ChecksTable checks={checks} />
             </section>
+
+            {isEditOpen && (
+              <EditMonitorModal
+                monitor={monitor}
+                error={editError}
+                isSubmitting={editMutation.isPending}
+                onClose={() => setIsEditOpen(false)}
+                onSubmit={handleEditSubmit}
+              />
+            )}
+            {isDeleteOpen && (
+              <DeleteMonitorConfirmModal
+                monitorName={monitor.name}
+                error={deleteError}
+                isSubmitting={deleteMutation.isPending}
+                onCancel={() => setIsDeleteOpen(false)}
+                onConfirm={() => {
+                  setDeleteError(null);
+                  deleteMutation.mutate();
+                }}
+              />
+            )}
           </>
         ) : null}
       </main>
     </div>
   );
+}
+
+function messageFor(err: unknown, fallback: string): string {
+  if (err instanceof ApiError && err.message) return err.message;
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
 }
 
 function Metric({

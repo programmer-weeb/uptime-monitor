@@ -499,9 +499,74 @@ describe('PATCH /api/monitors/:id', () => {
     const res = await request(app)
       .patch(`/api/monitors/${m.id}`)
       .set(...bearer(token))
-      .send({ url: 'https://changed.example.com' });
+      .send({ admin: true });
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('VALIDATION');
+  });
+
+  describe('url edit', () => {
+    it('updates the url and resets currentStatus + consecutiveFailures', async () => {
+      const { user, token } = await authedUser();
+      // Both example.com and example.org are IANA-reserved domains that
+      // resolve in real DNS, so urlGuard passes without needing a mock.
+      const m = await createMonitor({ userId: user.id, url: 'https://example.com' });
+      // Pre-seed a "down-trending" state so we can assert the reset.
+      await prisma.monitor.update({
+        where: { id: m.id },
+        data: { currentStatus: 'down', consecutiveFailures: 3 },
+      });
+
+      const res = await request(app)
+        .patch(`/api/monitors/${m.id}`)
+        .set(...bearer(token))
+        .send({ url: 'https://example.org' });
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({
+        id: m.id,
+        url: 'https://example.org',
+        currentStatus: 'unknown',
+      });
+
+      const reloaded = await prisma.monitor.findUnique({ where: { id: m.id } });
+      expect(reloaded?.url).toBe('https://example.org');
+      expect(reloaded?.currentStatus).toBe('unknown');
+      expect(reloaded?.consecutiveFailures).toBe(0);
+      expect(scheduleMonitorCheckMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not reset status when the url is unchanged', async () => {
+      const { user, token } = await authedUser();
+      const m = await createMonitor({ userId: user.id, url: 'https://example.com' });
+      await prisma.monitor.update({
+        where: { id: m.id },
+        data: { currentStatus: 'up', consecutiveFailures: 0 },
+      });
+
+      const res = await request(app)
+        .patch(`/api/monitors/${m.id}`)
+        .set(...bearer(token))
+        .send({ url: 'https://example.com', name: 'Renamed' });
+      expect(res.status).toBe(200);
+
+      const reloaded = await prisma.monitor.findUnique({ where: { id: m.id } });
+      expect(reloaded?.currentStatus).toBe('up');
+      expect(reloaded?.name).toBe('Renamed');
+    });
+
+    it('rejects a blocked URL with 422 URL_BLOCKED', async () => {
+      const { user, token } = await authedUser();
+      const m = await createMonitor({ userId: user.id });
+      const res = await request(app)
+        .patch(`/api/monitors/${m.id}`)
+        .set(...bearer(token))
+        .send({ url: 'http://localhost' });
+      expect(res.status).toBe(422);
+      expect(res.body.error).toBe('URL_BLOCKED');
+
+      const reloaded = await prisma.monitor.findUnique({ where: { id: m.id } });
+      expect(reloaded?.url).toBe(m.url);
+      expect(scheduleMonitorCheckMock).not.toHaveBeenCalled();
+    });
   });
 
   it("returns 404 for another user's monitor", async () => {

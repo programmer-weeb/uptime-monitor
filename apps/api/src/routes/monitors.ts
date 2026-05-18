@@ -208,12 +208,32 @@ monitorsRouter.patch(
     const userId = req.user!.id;
     const patch = req.body as PatchMonitorInput;
 
+    const data: Record<string, unknown> = { ...patch };
+
+    // URL change: validate against urlGuard (re-runs the §15.3 blocklist)
+    // and reset status fields so a healthy monitor doesn't appear "up"
+    // against a brand-new target until the next check lands.
+    if (patch.url !== undefined) {
+      const existing = await prisma.monitor.findFirst({
+        where: { id, userId },
+        select: { url: true },
+      });
+      if (!existing) {
+        throw new ApiError('NOT_FOUND', 'Monitor not found');
+      }
+      if (existing.url !== patch.url) {
+        await urlGuard(patch.url);
+        data.currentStatus = 'unknown';
+        data.consecutiveFailures = 0;
+      }
+    }
+
     // Owner-scoped updateMany lets us distinguish "not found" from
     // "exists but belongs to another user" — both collapse to 404 by
     // design (plan: prevent existence enumeration).
     const result = await prisma.monitor.updateMany({
       where: { id, userId },
-      data: patch,
+      data,
     });
     if (result.count === 0) {
       throw new ApiError('NOT_FOUND', 'Monitor not found');

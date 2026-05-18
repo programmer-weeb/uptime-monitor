@@ -23,6 +23,7 @@ export const createMonitorSchema = z
 export const patchMonitorSchema = z
   .object({
     name: nameSchema.optional(),
+    url: urlSchema.optional(),
     intervalMinutes: intervalSchema.optional(),
     isPaused: z.boolean().optional(),
   })

@@ -1,4 +1,4 @@
-import { apiGet, apiPatch, apiPost } from './client';
+import { apiDel, apiGet, apiPatch, apiPost } from './client';
 
 export type MonitorStatus = 'up' | 'down' | 'unknown';
 
@@ -43,6 +43,7 @@ export type CreateMonitorInput = {
 
 export type PatchMonitorInput = {
   name?: string;
+  url?: string;
   intervalMinutes?: number;
   isPaused?: boolean;
 };
@@ -73,4 +74,8 @@ export function listMonitorChecks(
 
 export function patchMonitor(id: string, input: PatchMonitorInput): Promise<Monitor> {
   return apiPatch<Monitor>(`/api/monitors/${id}`, input);
+}
+
+export function deleteMonitor(id: string): Promise<void> {
+  return apiDel<void>(`/api/monitors/${id}`);
 }
