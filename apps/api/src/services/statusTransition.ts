@@ -4,10 +4,10 @@ import type { CheckResult } from './checkRunner.js';
 
 type DbClient = Prisma.TransactionClient;
 
-export type AlertEmail = {
+export type Alert = {
   type: AlertType;
   monitorId: string;
-  to: string;
+  to: { email: string; phone: string | null };
   monitorName: string;
   monitorUrl: string;
   checkedAt: Date;
@@ -25,12 +25,13 @@ export type CheckTransitionResult = {
     checkedAt: Date;
   };
   monitor: Monitor;
-  alert: AlertEmail | null;
+  alert: Alert | null;
 };
 
 type MonitorWithUser = Monitor & {
   user: {
     email: string;
+    phone: string | null;
   };
 };
 
@@ -100,7 +101,7 @@ export async function writeCheckTransition(
     alert: {
       type: alertType,
       monitorId: monitor.id,
-      to: monitor.user.email,
+      to: { email: monitor.user.email, phone: monitor.user.phone },
       monitorName: monitor.name,
       monitorUrl: monitor.url,
       checkedAt,

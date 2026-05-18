@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AlertEmail } from '../src/services/statusTransition.js';
+import type { Alert } from '../src/services/statusTransition.js';
 
 // Hoisted so vi.mock can reach it and the test body can assert on it.
 const { sendMock } = vi.hoisted(() => ({ sendMock: vi.fn() }));
@@ -25,11 +25,11 @@ const { sendAlertEmail, _resetAlertEmailRateLimitForTests } = await import(
 );
 const { log } = await import('../src/config/log.js');
 
-function makeAlert(overrides: Partial<AlertEmail> = {}): AlertEmail {
+function makeAlert(overrides: Partial<Alert> = {}): Alert {
   return {
     type: 'down',
     monitorId: 'monitor-rate-limit',
-    to: 'user@example.test',
+    to: { email: 'user@example.test', phone: null },
     monitorName: 'Example',
     monitorUrl: 'https://example.com',
     checkedAt: new Date('2026-05-17T00:00:00.000Z'),

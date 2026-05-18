@@ -6,7 +6,7 @@
  * around the codebase. Stable shape = predictable invalidation.
  */
 export const queryKeys = {
-  me: () => ['me'] as const,
+  me: ['me'] as const,
   monitors: () => ['monitors'] as const,
   monitor: (id: string) => ['monitor', id] as const,
   monitorStats: (id: string) => ['monitor', id, 'stats'] as const,

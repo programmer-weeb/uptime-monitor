@@ -8,6 +8,7 @@ import { pruneOldChecks } from '../src/jobs/retention.js';
 import type { CheckJobData, ChecksQueueJobData, ChecksQueueJobName } from '../src/jobs/queue.js';
 import { emitCheckCompleted, emitMonitorStatusChanged } from '../src/realtime/socket.js';
 import { sendAlertEmail } from '../src/services/alertEmail.js';
+import { sendAlertWhatsApp } from '../src/services/alertWhatsApp.js';
 import { log } from '../src/config/log.js';
 
 vi.mock('../src/services/checkRunner.js', () => ({
@@ -31,19 +32,25 @@ vi.mock('../src/services/alertEmail.js', () => ({
   sendAlertEmail: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('../src/services/alertWhatsApp.js', () => ({
+  sendAlertWhatsApp: vi.fn().mockResolvedValue(undefined),
+}));
+
 const CHECK_JOB_NAME = 'check';
 const runCheckMock = vi.mocked(runCheck);
 const pruneOldChecksMock = vi.mocked(pruneOldChecks);
 const emitCheckCompletedMock = vi.mocked(emitCheckCompleted);
 const emitMonitorStatusChangedMock = vi.mocked(emitMonitorStatusChanged);
 const sendAlertEmailMock = vi.mocked(sendAlertEmail);
+const sendAlertWhatsAppMock = vi.mocked(sendAlertWhatsApp);
 
 beforeEach(() => {
   runCheckMock.mockReset();
   pruneOldChecksMock.mockReset();
   emitCheckCompletedMock.mockReset();
   emitMonitorStatusChangedMock.mockReset();
-  sendAlertEmailMock.mockReset();
+  sendAlertEmailMock.mockReset().mockResolvedValue(undefined);
+  sendAlertWhatsAppMock.mockReset().mockResolvedValue(undefined);
 });
 
 function checkJob(monitorId: string): Job<CheckJobData, void, typeof CHECK_JOB_NAME> {
@@ -118,7 +125,14 @@ describe('processCheckJob', () => {
     expect(sendAlertEmailMock).toHaveBeenCalledTimes(1);
     expect(sendAlertEmailMock).toHaveBeenCalledWith(expect.objectContaining({
       type: 'recovery',
-      to: user.email,
+      to: { email: user.email, phone: null },
+      monitorName: monitor.name,
+      monitorUrl: monitor.url,
+    }));
+    expect(sendAlertWhatsAppMock).toHaveBeenCalledTimes(1);
+    expect(sendAlertWhatsAppMock).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'recovery',
+      to: { email: user.email, phone: null },
       monitorName: monitor.name,
       monitorUrl: monitor.url,
     }));
@@ -160,7 +174,13 @@ describe('processCheckJob', () => {
     expect(sendAlertEmailMock).toHaveBeenCalledTimes(1);
     expect(sendAlertEmailMock).toHaveBeenCalledWith(expect.objectContaining({
       type: 'down',
-      to: user.email,
+      to: { email: user.email, phone: null },
+      error: 'HTTP_5XX',
+    }));
+    expect(sendAlertWhatsAppMock).toHaveBeenCalledTimes(1);
+    expect(sendAlertWhatsAppMock).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'down',
+      to: { email: user.email, phone: null },
       error: 'HTTP_5XX',
     }));
   });
@@ -176,6 +196,7 @@ describe('processCheckJob', () => {
     expect(emitCheckCompletedMock).not.toHaveBeenCalled();
     expect(emitMonitorStatusChangedMock).not.toHaveBeenCalled();
     expect(sendAlertEmailMock).not.toHaveBeenCalled();
+    expect(sendAlertWhatsAppMock).not.toHaveBeenCalled();
   });
 
   it('skips missing monitors', async () => {
@@ -186,6 +207,7 @@ describe('processCheckJob', () => {
     expect(emitCheckCompletedMock).not.toHaveBeenCalled();
     expect(emitMonitorStatusChangedMock).not.toHaveBeenCalled();
     expect(sendAlertEmailMock).not.toHaveBeenCalled();
+    expect(sendAlertWhatsAppMock).not.toHaveBeenCalled();
   });
 
   it('emits one structured log line per check completion (plan §15.4)', async () => {

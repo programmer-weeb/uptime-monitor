@@ -7,6 +7,7 @@ const nextEmail = (): string => `user-${++counter}-${Date.now()}@test.local`;
 type CreateUserOpts = {
   email?: string;
   password?: string;
+  phone?: string | null;
   isDemo?: boolean;
 };
 
@@ -15,6 +16,7 @@ export async function createUser(opts: CreateUserOpts = {}) {
     data: {
       email: (opts.email ?? nextEmail()).toLowerCase(),
       passwordHash: await bcrypt.hash(opts.password ?? 'testpass123', 4),
+      phone: opts.phone ?? null,
       isDemo: opts.isDemo ?? false,
     },
   });

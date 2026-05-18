@@ -78,12 +78,17 @@ JWT_SECRET=replace-me-with-at-least-32-characters
 JWT_TTL_SECONDS=86400
 RESEND_API_KEY=
 EMAIL_FROM=
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_WHATSAPP_FROM=
 CORS_ORIGIN=http://localhost:5173
 PORT=4000
 NODE_ENV=development
 LOG_LEVEL=debug
 APP_MODE=all
 ```
+
+When a user sets a phone number in Settings, alerts are sent by both email and WhatsApp. In development, WhatsApp uses the Twilio sandbox; production needs approved templates.
 
 Web env file: `apps/web/.env`
 
@@ -99,6 +104,8 @@ HTTP routes:
 - `POST /api/auth/signup` - create a user and return a JWT. Rate-limited 3/hr per IP.
 - `POST /api/auth/login` - authenticate and return a JWT. Rate-limited 10/min per IP.
 - `GET /api/auth/me` - return the current authenticated user.
+- `GET /api/me` - return the current authenticated user's profile, including phone.
+- `PATCH /api/me` - update the current authenticated user's phone number.
 - `GET /api/monitors` - list monitors for the current user.
 - `POST /api/monitors` - create a monitor and schedule checks. Rate-limited 5/min per user.
 - `GET /api/monitors/:id` - fetch one owned monitor.

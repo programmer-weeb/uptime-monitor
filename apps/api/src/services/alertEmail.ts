@@ -1,7 +1,7 @@
 import { Resend } from 'resend';
 import { env } from '../config/env.js';
 import { log } from '../config/log.js';
-import type { AlertEmail } from './statusTransition.js';
+import type { Alert } from './statusTransition.js';
 
 let resend: Resend | null = null;
 
@@ -12,7 +12,7 @@ let resend: Resend | null = null;
 const RATE_LIMIT_MS = 60_000;
 const lastSentAtByMonitor = new Map<string, number>();
 
-export async function sendAlertEmail(alert: AlertEmail): Promise<void> {
+export async function sendAlertEmail(alert: Alert): Promise<void> {
   const now = Date.now();
   const last = lastSentAtByMonitor.get(alert.monitorId);
   if (last !== undefined && now - last < RATE_LIMIT_MS) {
@@ -24,14 +24,17 @@ export async function sendAlertEmail(alert: AlertEmail): Promise<void> {
   }
 
   if (!env.RESEND_API_KEY || !env.EMAIL_FROM) {
-    log.warn({ alertType: alert.type, to: alert.to }, 'alert email skipped; email env missing');
+    log.warn(
+      { alertType: alert.type, to: alert.to.email },
+      'alert email skipped; email env missing',
+    );
     return;
   }
 
   resend ??= new Resend(env.RESEND_API_KEY);
   await resend.emails.send({
     from: env.EMAIL_FROM,
-    to: alert.to,
+    to: alert.to.email,
     subject: subjectFor(alert),
     html: htmlFor(alert),
   });
@@ -42,13 +45,13 @@ export function _resetAlertEmailRateLimitForTests(): void {
   lastSentAtByMonitor.clear();
 }
 
-function subjectFor(alert: AlertEmail): string {
+function subjectFor(alert: Alert): string {
   return alert.type === 'down'
     ? `Down alert: ${alert.monitorName}`
     : `Recovery alert: ${alert.monitorName}`;
 }
 
-function htmlFor(alert: AlertEmail): string {
+function htmlFor(alert: Alert): string {
   const statusText =
     alert.type === 'down'
       ? 'Your monitor has failed two consecutive checks.'

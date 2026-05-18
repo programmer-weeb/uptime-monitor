@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import MonitorDetail from './pages/MonitorDetail';
+import Settings from './pages/Settings';
 
 // One QueryClient for the app. Defaults per §15.8/§16.14: server data is
 // refreshed via socket events (Day 11+), not aggressive polling.
@@ -39,6 +40,14 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <MonitorDetail />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <Settings />
                 </ProtectedRoute>
               }
             />

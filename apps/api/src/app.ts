@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { corsOrigins } from './config/env.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { accountRouter } from './routes/account.js';
 import { authRouter } from './routes/auth.js';
 import { monitorsRouter } from './routes/monitors.js';
 
@@ -20,6 +21,7 @@ export function createApp(): Express {
   });
 
   app.use('/api/auth', authRouter);
+  app.use('/api', accountRouter);
   app.use('/api/monitors', monitorsRouter);
 
   app.use(notFoundHandler);

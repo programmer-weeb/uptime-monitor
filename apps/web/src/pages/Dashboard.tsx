@@ -81,6 +81,9 @@ export default function Dashboard() {
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <h1 className="text-lg font-semibold text-gray-900">Uptime Monitor</h1>
           <div className="flex items-center gap-3 text-sm">
+            <Link to="/settings" className="text-blue-600 hover:underline">
+              Settings
+            </Link>
             {user && <span className="text-gray-600">{user.email}</span>}
             <button
               type="button"

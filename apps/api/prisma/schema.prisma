@@ -27,6 +27,7 @@ model User {
   id           String    @id @default(cuid())
   email        String    @unique
   passwordHash String    @map("password_hash")
+  phone        String?
   isDemo       Boolean   @default(false) @map("is_demo")
   createdAt    DateTime  @default(now()) @map("created_at")
   monitors     Monitor[]
