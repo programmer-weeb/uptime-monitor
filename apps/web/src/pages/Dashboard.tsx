@@ -76,60 +76,62 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-gray-900">Uptime Monitor</h1>
-          <div className="flex items-center gap-3 text-sm">
-            <Link to="/settings" className="text-blue-600 hover:underline">
+    <div className="min-h-screen bg-canvas">
+      <header className="bg-canvas border-b border-hairline">
+        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+          <span className="font-display text-xl text-ink tracking-tight">Uptime Monitor</span>
+          <nav className="flex items-center gap-4 text-sm">
+            <Link to="/settings" className="text-charcoal hover:text-ink transition-colors">
               Settings
             </Link>
-            {user && <span className="text-gray-600">{user.email}</span>}
+            {user && <span className="text-stone hidden sm:inline">{user.email}</span>}
             <button
               type="button"
               onClick={logout}
-              className="text-blue-600 hover:underline"
+              className="text-charcoal hover:text-ink transition-colors"
             >
               Sign out
             </button>
-          </div>
+          </nav>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-6 space-y-4">
+      <main className="max-w-5xl mx-auto px-4 py-8 space-y-4">
         {user?.isDemo && (
           <div
             role="status"
-            className="rounded-md border border-yellow-300 bg-yellow-50 text-yellow-900 text-sm px-4 py-2"
+            className="rounded-md border border-accent-yellow/20 bg-accent-yellow/5 px-4 py-2.5 text-sm text-accent-yellow"
           >
             Demo account — read only.
           </div>
         )}
 
-        <section className="bg-white border border-gray-200 rounded-md">
-          <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-3">
+        <section className="rounded-lg border border-hairline-strong bg-surface-card">
+          <div className="px-5 py-4 border-b border-hairline flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-base font-semibold text-gray-900">Monitors</h2>
-              <p className="text-sm text-gray-500">{monitorsSummary(monitorsQuery.isLoading, monitors.length)}</p>
+              <h2 className="text-base font-semibold text-ink">Monitors</h2>
+              <p className="text-sm text-mute mt-0.5">
+                {monitorsSummary(monitorsQuery.isLoading, monitors.length)}
+              </p>
             </div>
             <button
               type="button"
               onClick={openAddModal}
               disabled={user?.isDemo}
-              className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-md bg-primary text-primary-on px-3 py-2 text-sm font-medium hover:bg-surface-light transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             >
               Add monitor
             </button>
           </div>
 
           {monitorsQuery.isLoading ? (
-            <div className="p-6 text-sm text-gray-600">Loading monitors…</div>
+            <div className="p-6 text-sm text-mute">Loading monitors…</div>
           ) : monitorsQuery.isError ? (
-            <div role="alert" className="p-6 text-sm text-red-600">
+            <div role="alert" className="p-6 text-sm text-accent-red">
               Could not load monitors.
             </div>
           ) : sortedMonitors.length === 0 ? (
-            <div className="p-6 text-sm text-gray-600">
+            <div className="p-8 text-sm text-mute text-center">
               No monitors yet. Add your first HTTPS URL to start tracking uptime.
             </div>
           ) : (
@@ -155,55 +157,55 @@ export default function Dashboard() {
 function MonitorTable({ monitors }: { monitors: Monitor[] }) {
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200 text-sm">
-        <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-          <tr>
-            <th scope="col" className="px-4 py-3">
+      <table className="min-w-full text-sm">
+        <thead>
+          <tr className="border-b border-hairline">
+            <th scope="col" className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-ash">
               Name
             </th>
-            <th scope="col" className="px-4 py-3">
+            <th scope="col" className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-ash">
               URL
             </th>
-            <th scope="col" className="px-4 py-3">
+            <th scope="col" className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-ash">
               Status
             </th>
-            <th scope="col" className="px-4 py-3">
+            <th scope="col" className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-ash">
               Last checked
             </th>
-            <th scope="col" className="px-4 py-3 text-right">
+            <th scope="col" className="px-5 py-3 text-right text-xs font-medium uppercase tracking-wider text-ash">
               Latency
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100 bg-white">
+        <tbody>
           {monitors.map((monitor) => (
-            <tr key={monitor.id} className="align-top">
-              <td className="px-4 py-3">
+            <tr key={monitor.id} className="border-b border-hairline last:border-0 hover:bg-surface-elevated/40 transition-colors">
+              <td className="px-5 py-3.5">
                 <Link
                   to={`/monitors/${monitor.id}`}
-                  className="font-medium text-blue-700 hover:underline"
+                  className="font-medium text-ink hover:text-accent-blue transition-colors"
                 >
                   {monitor.name}
                 </Link>
-                <div className="text-xs text-gray-500">{monitor.intervalMinutes} min interval</div>
+                <div className="text-xs text-stone mt-0.5">{monitor.intervalMinutes} min</div>
               </td>
-              <td className="px-4 py-3">
+              <td className="px-5 py-3.5">
                 <a
                   href={monitor.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="block max-w-xs truncate text-blue-600 hover:underline"
+                  className="block max-w-xs truncate text-link hover:underline text-xs font-mono"
                 >
                   {monitor.url}
                 </a>
               </td>
-              <td className="px-4 py-3">
+              <td className="px-5 py-3.5">
                 <StatusBadge status={monitor.currentStatus} />
               </td>
-              <td className="px-4 py-3 text-gray-600">
+              <td className="px-5 py-3.5 text-charcoal text-xs">
                 {formatDateTime(monitor.lastCheckedAt ?? monitor.lastCheck?.checkedAt)}
               </td>
-              <td className="px-4 py-3 text-right tabular-nums text-gray-700">
+              <td className="px-5 py-3.5 text-right tabular-nums text-charcoal text-xs font-mono">
                 {formatLatency(getLatency(monitor))}
               </td>
             </tr>
@@ -240,22 +242,22 @@ function AddMonitorModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="add-monitor-title"
-        className="w-full max-w-md rounded-md border border-gray-200 bg-white p-5 shadow-lg"
+        className="w-full max-w-md rounded-lg border border-hairline-strong bg-surface-card p-6"
       >
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 id="add-monitor-title" className="text-lg font-semibold text-gray-900">
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <h2 id="add-monitor-title" className="text-lg font-semibold text-ink">
             Add monitor
           </h2>
           <button
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-800 disabled:opacity-60"
+            className="rounded-md px-2 py-1 text-sm text-mute hover:text-ink hover:bg-surface-elevated transition-colors disabled:opacity-50"
             aria-label="Close"
           >
             Close
@@ -264,7 +266,7 @@ function AddMonitorModal({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="monitor-name" className="mb-1 block text-sm font-medium text-gray-700">
+            <label htmlFor="monitor-name" className="mb-1.5 block text-sm font-medium text-charcoal">
               Name
             </label>
             <input
@@ -274,12 +276,12 @@ function AddMonitorModal({
               onChange={(e) => setName(e.target.value)}
               required
               maxLength={100}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-md border border-hairline-strong bg-surface-deep px-3 py-2.5 text-sm text-ink placeholder:text-stone focus:outline-none focus:border-ink transition-colors"
             />
           </div>
 
           <div>
-            <label htmlFor="monitor-url" className="mb-1 block text-sm font-medium text-gray-700">
+            <label htmlFor="monitor-url" className="mb-1.5 block text-sm font-medium text-charcoal">
               URL
             </label>
             <input
@@ -290,12 +292,12 @@ function AddMonitorModal({
               required
               placeholder="https://example.com"
               pattern="https://.*"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-md border border-hairline-strong bg-surface-deep px-3 py-2.5 text-sm text-ink placeholder:text-stone focus:outline-none focus:border-ink transition-colors font-mono"
             />
           </div>
 
           <div>
-            <label htmlFor="monitor-interval" className="mb-1 block text-sm font-medium text-gray-700">
+            <label htmlFor="monitor-interval" className="mb-1.5 block text-sm font-medium text-charcoal">
               Check interval
             </label>
             <select
@@ -304,10 +306,10 @@ function AddMonitorModal({
               onChange={(e) =>
                 setIntervalMinutes(Number(e.target.value) as (typeof INTERVAL_OPTIONS)[number])
               }
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-md border border-hairline-strong bg-surface-deep px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-ink transition-colors"
             >
               {INTERVAL_OPTIONS.map((interval) => (
-                <option key={interval} value={interval}>
+                <option key={interval} value={interval} className="bg-surface-deep">
                   Every {interval} minute{interval === 1 ? '' : 's'}
                 </option>
               ))}
@@ -315,7 +317,7 @@ function AddMonitorModal({
           </div>
 
           {error && (
-            <p role="alert" className="text-sm text-red-600">
+            <p role="alert" className="text-sm text-accent-red">
               {error}
             </p>
           )}
@@ -325,14 +327,14 @@ function AddMonitorModal({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              className="rounded-md border border-hairline-strong bg-surface-elevated px-3 py-2 text-sm font-medium text-ink hover:bg-surface-elevated/80 transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+              className="rounded-md bg-primary text-primary-on px-3 py-2 text-sm font-medium hover:bg-surface-light transition-colors disabled:opacity-50"
             >
               {isSubmitting ? 'Adding…' : 'Add monitor'}
             </button>
@@ -344,22 +346,32 @@ function AddMonitorModal({
 }
 
 function StatusBadge({ status }: { status: Monitor['currentStatus'] }) {
-  const classes =
-    status === 'up'
-      ? 'border-green-200 bg-green-50 text-green-700'
-      : status === 'down'
-        ? 'border-red-200 bg-red-50 text-red-700'
-        : 'border-gray-200 bg-gray-50 text-gray-600';
-
+  if (status === 'up') {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-accent-green">
+        <span className="w-1.5 h-1.5 rounded-full bg-accent-green" />
+        up
+      </span>
+    );
+  }
+  if (status === 'down') {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-accent-red">
+        <span className="w-1.5 h-1.5 rounded-full bg-accent-red" />
+        down
+      </span>
+    );
+  }
   return (
-    <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${classes}`}>
-      {status}
+    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-mute">
+      <span className="w-1.5 h-1.5 rounded-full bg-mute" />
+      unknown
     </span>
   );
 }
 
 function monitorsSummary(isLoading: boolean, count: number): string {
-  if (isLoading) return 'Loading status data';
+  if (isLoading) return 'Loading…';
   if (count === 0) return 'No monitors configured';
   return `${count} monitor${count === 1 ? '' : 's'} configured`;
 }

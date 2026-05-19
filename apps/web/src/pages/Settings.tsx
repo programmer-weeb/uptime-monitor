@@ -42,7 +42,6 @@ export default function Settings() {
     return () => window.clearTimeout(timeout);
   }, [saved]);
 
-  // Poll for telegram connection while in linking step
   useEffect(() => {
     if (connectStep !== 'linking') return;
 
@@ -71,7 +70,6 @@ export default function Settings() {
     return () => window.clearInterval(intervalId);
   }, [connectStep, queryClient]);
 
-  // Transition out of linking when socket event updates query cache
   useEffect(() => {
     if (connectStep === 'linking' && meQuery.data?.telegramChatId) {
       setConnectStep('idle');
@@ -131,66 +129,69 @@ export default function Settings() {
   const connectedChatId = meQuery.data?.telegramChatId ?? null;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="min-w-0">
-            <Link to="/" className="text-sm font-medium text-blue-600 hover:underline">
-              Monitors
+    <div className="min-h-screen bg-canvas">
+      <header className="bg-canvas border-b border-hairline">
+        <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link to="/" className="text-sm text-charcoal hover:text-ink transition-colors">
+              ← Monitors
             </Link>
-            <h1 className="text-lg font-semibold text-gray-900">Settings</h1>
+            <span className="text-stone">/</span>
+            <h1 className="text-sm font-medium text-ink">Settings</h1>
           </div>
-          <button type="button" onClick={logout} className="text-sm text-blue-600 hover:underline">
+          <button type="button" onClick={logout} className="text-sm text-charcoal hover:text-ink transition-colors">
             Sign out
           </button>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-6 space-y-4">
+      <main className="max-w-3xl mx-auto px-4 py-8 space-y-4">
         {meQuery.isLoading ? (
-          <div className="rounded-md border border-gray-200 bg-white p-6 text-sm text-gray-600">
+          <div className="rounded-lg border border-hairline-strong bg-surface-card p-6 text-sm text-mute">
             Loading settings…
           </div>
         ) : meQuery.isError ? (
-          <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+          <div role="alert" className="rounded-lg border border-accent-red/20 bg-accent-red/5 p-6 text-sm text-accent-red">
             Could not load settings.
           </div>
         ) : (
           <>
-            {/* Email */}
-            <section className="rounded-md border border-gray-200 bg-white">
-              <div className="border-b border-gray-200 px-4 py-3">
-                <h2 className="text-base font-semibold text-gray-900">Account</h2>
+            {/* Account section */}
+            <section className="rounded-lg border border-hairline-strong bg-surface-card">
+              <div className="border-b border-hairline px-5 py-3.5">
+                <h2 className="text-sm font-semibold text-ink">Account</h2>
               </div>
-              <div className="px-4 py-4">
-                <label className="mb-1 block text-sm font-medium text-gray-700">Email</label>
+              <div className="px-5 py-4">
+                <label className="mb-1.5 block text-sm font-medium text-charcoal">Email</label>
                 <input
                   type="email"
                   value={meQuery.data?.email ?? ''}
                   disabled
-                  className="w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-600"
+                  className="w-full rounded-md border border-hairline-strong bg-surface-deep px-3 py-2.5 text-sm text-stone cursor-not-allowed"
                 />
               </div>
             </section>
 
-            {/* Telegram alerts */}
-            <section className="rounded-md border border-gray-200 bg-white">
-              <div className="border-b border-gray-200 px-4 py-3">
-                <h2 className="text-base font-semibold text-gray-900">Telegram alerts</h2>
+            {/* Telegram section */}
+            <section className="rounded-lg border border-hairline-strong bg-surface-card">
+              <div className="border-b border-hairline px-5 py-3.5">
+                <h2 className="text-sm font-semibold text-ink">Telegram alerts</h2>
               </div>
 
-              <div className="px-4 py-4 space-y-4">
+              <div className="px-5 py-4 space-y-4">
                 {/* Connected state */}
                 {connectedChatId && connectStep === 'idle' && (
-                  <div className="flex items-center justify-between rounded-md border border-green-200 bg-green-50 px-3 py-2">
-                    <span className="text-sm text-green-800">
-                      Connected · chat ID <code className="font-mono">{connectedChatId}</code>
+                  <div className="flex items-center justify-between rounded-md border border-accent-green/20 bg-accent-green/5 px-3 py-2.5">
+                    <span className="text-sm text-accent-green flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-accent-green" />
+                      Connected · chat ID{' '}
+                      <code className="font-mono text-xs">{connectedChatId}</code>
                     </span>
                     <button
                       type="button"
                       disabled={disconnectMutation.isPending || isDemo}
                       onClick={() => disconnectMutation.mutate()}
-                      className="ml-4 text-sm text-red-600 hover:underline disabled:opacity-50"
+                      className="ml-4 text-sm text-accent-red hover:underline disabled:opacity-50"
                     >
                       {disconnectMutation.isPending ? 'Disconnecting…' : 'Disconnect'}
                     </button>
@@ -204,37 +205,37 @@ export default function Settings() {
                       type="button"
                       disabled={connectMutation.isPending || isDemo}
                       onClick={() => connectMutation.mutate()}
-                      className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="rounded-md bg-primary text-primary-on px-3 py-2 text-sm font-medium hover:bg-surface-light transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {connectMutation.isPending ? 'Generating link…' : 'Connect Telegram'}
                     </button>
                     {isDemo && (
-                      <p className="mt-1 text-sm text-yellow-700">Demo accounts cannot change settings.</p>
+                      <p className="mt-1.5 text-xs text-accent-yellow">Demo accounts cannot change settings.</p>
                     )}
                   </div>
                 )}
 
                 {/* Linking in progress */}
                 {connectStep === 'linking' && deeplink && (
-                  <div className="space-y-3 rounded-md border border-blue-200 bg-blue-50 px-4 py-3">
-                    <p className="text-sm font-medium text-blue-900">
+                  <div className="space-y-3 rounded-md border border-accent-blue/20 bg-accent-blue/5 px-4 py-3">
+                    <p className="text-sm font-medium text-ink">
                       Tap the button below to open Telegram, then tap <strong>Start</strong>.
                     </p>
                     <a
                       href={deeplink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-block rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                      className="inline-block rounded-md bg-primary text-primary-on px-4 py-2 text-sm font-medium hover:bg-surface-light transition-colors"
                     >
                       Open Telegram →
                     </a>
-                    <p className="text-xs text-blue-700">
+                    <p className="text-xs text-mute">
                       Waiting for confirmation… Link expires in 10 minutes.
                     </p>
                     <button
                       type="button"
                       onClick={() => { setConnectStep('idle'); setDeeplink(null); }}
-                      className="text-xs text-blue-600 hover:underline"
+                      className="text-xs text-charcoal hover:text-ink hover:underline"
                     >
                       Cancel
                     </button>
@@ -243,12 +244,12 @@ export default function Settings() {
 
                 {/* Expired */}
                 {connectStep === 'expired' && (
-                  <div className="rounded-md border border-yellow-200 bg-yellow-50 px-3 py-2">
-                    <p className="text-sm text-yellow-800">Link expired. Try again.</p>
+                  <div className="rounded-md border border-accent-yellow/20 bg-accent-yellow/5 px-3 py-2.5">
+                    <p className="text-sm text-accent-yellow">Link expired. Try again.</p>
                     <button
                       type="button"
                       onClick={() => setConnectStep('idle')}
-                      className="mt-1 text-sm text-blue-600 hover:underline"
+                      className="mt-1 text-sm text-link hover:underline"
                     >
                       Try again
                     </button>
@@ -256,15 +257,15 @@ export default function Settings() {
                 )}
 
                 {connectError && (
-                  <p role="alert" className="text-sm text-red-600">{connectError}</p>
+                  <p role="alert" className="text-sm text-accent-red">{connectError}</p>
                 )}
 
                 {/* Manual fallback */}
                 <details className="text-sm">
-                  <summary className="cursor-pointer text-gray-500 hover:text-gray-700">
+                  <summary className="cursor-pointer text-mute hover:text-charcoal transition-colors select-none">
                     Enter chat ID manually
                   </summary>
-                  <form onSubmit={handleManualSubmit} className="mt-3 space-y-3">
+                  <form onSubmit={handleManualSubmit} className="mt-4 space-y-3">
                     <div>
                       <input
                         id="settings-telegram-chat-id"
@@ -273,26 +274,24 @@ export default function Settings() {
                         value={telegramChatId}
                         onChange={(e) => setTelegramChatId(e.target.value)}
                         placeholder="123456789"
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full rounded-md border border-hairline-strong bg-surface-deep px-3 py-2.5 text-sm text-ink placeholder:text-stone focus:outline-none focus:border-ink transition-colors font-mono"
                       />
-                      <p className="mt-1 text-xs text-gray-500">
+                      <p className="mt-1.5 text-xs text-mute">
                         Leave blank to disable Telegram alerts. Message{' '}
-                        <code className="font-mono">@userinfobot</code> on Telegram to get your chat ID.
+                        <code className="font-mono text-accent-blue">@userinfobot</code> on Telegram to get your chat ID.
                       </p>
                     </div>
                     {manualError && (
-                      <p role="alert" className="text-sm text-red-600">{manualError}</p>
+                      <p role="alert" className="text-sm text-accent-red">{manualError}</p>
                     )}
-                    {saved && <p role="status" className="text-sm text-green-700">Saved.</p>}
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="submit"
-                        disabled={manualMutation.isPending || isDemo}
-                        className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {manualMutation.isPending ? 'Saving…' : 'Save'}
-                      </button>
-                    </div>
+                    {saved && <p role="status" className="text-sm text-accent-green">Saved.</p>}
+                    <button
+                      type="submit"
+                      disabled={manualMutation.isPending || isDemo}
+                      className="rounded-md bg-primary text-primary-on px-3 py-2 text-sm font-medium hover:bg-surface-light transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {manualMutation.isPending ? 'Saving…' : 'Save'}
+                    </button>
                   </form>
                 </details>
               </div>

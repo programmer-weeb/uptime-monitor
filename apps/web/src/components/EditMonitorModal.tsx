@@ -45,22 +45,22 @@ export function EditMonitorModal({
     intervalMinutes !== monitor.intervalMinutes;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="edit-monitor-title"
-        className="w-full max-w-md rounded-md border border-gray-200 bg-white p-5 shadow-lg"
+        className="w-full max-w-md rounded-lg border border-hairline-strong bg-surface-card p-6"
       >
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 id="edit-monitor-title" className="text-lg font-semibold text-gray-900">
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <h2 id="edit-monitor-title" className="text-lg font-semibold text-ink">
             Edit monitor
           </h2>
           <button
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-800 disabled:opacity-60"
+            className="rounded-md px-2 py-1 text-sm text-mute hover:text-ink hover:bg-surface-elevated transition-colors disabled:opacity-50"
             aria-label="Close"
           >
             Close
@@ -69,7 +69,7 @@ export function EditMonitorModal({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="edit-monitor-name" className="mb-1 block text-sm font-medium text-gray-700">
+            <label htmlFor="edit-monitor-name" className="mb-1.5 block text-sm font-medium text-charcoal">
               Name
             </label>
             <input
@@ -79,12 +79,12 @@ export function EditMonitorModal({
               onChange={(e) => setName(e.target.value)}
               required
               maxLength={100}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-md border border-hairline-strong bg-surface-deep px-3 py-2.5 text-sm text-ink placeholder:text-stone focus:outline-none focus:border-ink transition-colors"
             />
           </div>
 
           <div>
-            <label htmlFor="edit-monitor-url" className="mb-1 block text-sm font-medium text-gray-700">
+            <label htmlFor="edit-monitor-url" className="mb-1.5 block text-sm font-medium text-charcoal">
               URL
             </label>
             <input
@@ -95,17 +95,17 @@ export function EditMonitorModal({
               required
               placeholder="https://example.com"
               pattern="https://.*"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-md border border-hairline-strong bg-surface-deep px-3 py-2.5 text-sm text-ink placeholder:text-stone focus:outline-none focus:border-ink transition-colors font-mono"
             />
-            <p className="mt-1 text-xs text-gray-500">
-              Changing the URL resets the current status — the next check will populate it.
+            <p className="mt-1.5 text-xs text-mute">
+              Changing the URL resets the current status.
             </p>
           </div>
 
           <div>
             <label
               htmlFor="edit-monitor-interval"
-              className="mb-1 block text-sm font-medium text-gray-700"
+              className="mb-1.5 block text-sm font-medium text-charcoal"
             >
               Check interval
             </label>
@@ -116,10 +116,10 @@ export function EditMonitorModal({
                 const next = Number(e.target.value);
                 if (isInterval(next)) setIntervalMinutes(next);
               }}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-md border border-hairline-strong bg-surface-deep px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-ink transition-colors"
             >
               {INTERVAL_OPTIONS.map((interval) => (
-                <option key={interval} value={interval}>
+                <option key={interval} value={interval} className="bg-surface-deep">
                   Every {interval} minute{interval === 1 ? '' : 's'}
                 </option>
               ))}
@@ -127,7 +127,7 @@ export function EditMonitorModal({
           </div>
 
           {error && (
-            <p role="alert" className="text-sm text-red-600">
+            <p role="alert" className="text-sm text-accent-red">
               {error}
             </p>
           )}
@@ -137,14 +137,14 @@ export function EditMonitorModal({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              className="rounded-md border border-hairline-strong bg-surface-elevated px-3 py-2 text-sm font-medium text-ink hover:bg-surface-elevated/80 transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting || !hasChanges}
-              className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+              className="rounded-md bg-primary text-primary-on px-3 py-2 text-sm font-medium hover:bg-surface-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? 'Saving…' : 'Save changes'}
             </button>
