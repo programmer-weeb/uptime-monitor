@@ -230,7 +230,7 @@ export default function Settings() {
                       Open Telegram →
                     </a>
                     <p className="text-xs text-mute">
-                      Waiting for confirmation… Link expires in 10 minutes.
+                      Waiting for confirmation… Link expires in 3 minutes.
                     </p>
                     <button
                       type="button"

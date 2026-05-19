@@ -31,3 +31,11 @@ export const createMonitorLimiter = rateLimit({
   limit: isTest ? 1000 : 5,
   keyGenerator: (req) => req.user?.id ?? req.ip ?? 'anonymous',
 });
+
+// 5 Telegram connect attempts per hour per user — each creates a Redis key.
+export const telegramConnectLimiter = rateLimit({
+  ...baseOpts,
+  windowMs: 60 * 60 * 1000,
+  limit: isTest ? 1000 : 5,
+  keyGenerator: (req) => req.user?.id ?? req.ip ?? 'anonymous',
+});

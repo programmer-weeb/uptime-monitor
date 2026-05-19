@@ -31,6 +31,9 @@ async function main() {
     createRealtimeServer(server);
   }
   if (shouldRunApi && env.TELEGRAM_BOT_TOKEN && env.API_PUBLIC_URL) {
+    if (!env.TELEGRAM_WEBHOOK_SECRET) {
+      log.warn('TELEGRAM_WEBHOOK_SECRET not set — webhook endpoint has no secret validation');
+    }
     await getBotUsername();
     await registerWebhook(`${env.API_PUBLIC_URL}/api/telegram/webhook`);
   }

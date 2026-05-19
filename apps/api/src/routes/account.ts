@@ -5,6 +5,7 @@ import { prisma } from '../config/prisma.js';
 import { redisClient } from '../config/redis.js';
 import { ApiError } from '../lib/errors.js';
 import { requireAuth, requireNonDemo } from '../middleware/auth.js';
+import { telegramConnectLimiter } from '../middleware/rateLimit.js';
 import { validate } from '../middleware/validate.js';
 import { getBotUsername } from '../services/telegramBot.js';
 
@@ -45,9 +46,17 @@ accountRouter.patch('/me', requireAuth, requireNonDemo, validate(patchMeSchema),
   res.json(user);
 });
 
-accountRouter.post('/me/telegram-connect', requireAuth, requireNonDemo, async (req: Request, res: Response) => {
+accountRouter.post('/me/telegram-connect', requireAuth, requireNonDemo, telegramConnectLimiter, async (req: Request, res: Response) => {
   const token = randomBytes(24).toString('hex');
+
+  const prevToken = await redisClient.get(`telegram:link:user:${req.user!.id}`);
+  if (prevToken) {
+    await redisClient.del(`telegram:link:${prevToken}`);
+  }
+
   await redisClient.set(`telegram:link:${token}`, req.user!.id, 'EX', 600);
+  await redisClient.set(`telegram:link:user:${req.user!.id}`, token, 'EX', 600);
+
   const botUsername = await getBotUsername();
   res.json({ token, botUsername });
 });

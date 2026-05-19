@@ -17,7 +17,9 @@ type TelegramUpdate = {
 
 telegramWebhookRouter.post('/telegram/webhook', (req: Request, res: Response) => {
   res.sendStatus(200);
-  void handleUpdate(req.body as TelegramUpdate, req.headers['x-telegram-bot-api-secret-token'] as string | undefined);
+  handleUpdate(req.body as TelegramUpdate, req.headers['x-telegram-bot-api-secret-token'] as string | undefined).catch(
+    (err) => log.error({ err }, 'telegram webhook handler failed'),
+  );
 });
 
 async function handleUpdate(update: TelegramUpdate, secretHeader: string | undefined): Promise<void> {
@@ -45,6 +47,7 @@ async function handleUpdate(update: TelegramUpdate, secretHeader: string | undef
   }
 
   await redisClient.del(`telegram:link:${token}`);
+  await redisClient.del(`telegram:link:user:${userId}`);
 
   const chatIdStr = String(chatId);
 
