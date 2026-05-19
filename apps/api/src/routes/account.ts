@@ -5,11 +5,14 @@ import { ApiError } from '../lib/errors.js';
 import { requireAuth, requireNonDemo } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 
-const E164 = /^\+[1-9]\d{6,14}$/;
+const TELEGRAM_CHAT_ID_RE = /^-?\d+$/;
 
 const patchMeSchema = z
   .object({
-    phone: z.string().regex(E164, 'phone must be E.164, e.g. +14155551212').nullable(),
+    telegramChatId: z
+      .string()
+      .regex(TELEGRAM_CHAT_ID_RE, 'telegramChatId must be a number, e.g. 123456789')
+      .nullable(),
   })
   .strict();
 
@@ -18,7 +21,7 @@ export const accountRouter = Router();
 accountRouter.get('/me', requireAuth, async (req: Request, res: Response) => {
   const user = await prisma.user.findUnique({
     where: { id: req.user!.id },
-    select: { id: true, email: true, phone: true, isDemo: true, createdAt: true },
+    select: { id: true, email: true, telegramChatId: true, isDemo: true, createdAt: true },
   });
 
   if (!user) {
@@ -29,11 +32,11 @@ accountRouter.get('/me', requireAuth, async (req: Request, res: Response) => {
 });
 
 accountRouter.patch('/me', requireAuth, requireNonDemo, validate(patchMeSchema), async (req: Request, res: Response) => {
-  const { phone } = req.body as z.infer<typeof patchMeSchema>;
+  const { telegramChatId } = req.body as z.infer<typeof patchMeSchema>;
   const user = await prisma.user.update({
     where: { id: req.user!.id },
-    data: { phone },
-    select: { id: true, email: true, phone: true, isDemo: true, createdAt: true },
+    data: { telegramChatId },
+    select: { id: true, email: true, telegramChatId: true, isDemo: true, createdAt: true },
   });
 
   res.json(user);

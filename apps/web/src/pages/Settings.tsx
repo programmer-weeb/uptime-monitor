@@ -7,12 +7,12 @@ import { getMe, updateMe, type Me } from '../api/account';
 import { queryKeys } from '../api/queryKeys';
 import { useAuth } from '../lib/useAuth';
 
-const E164 = /^\+[1-9]\d{6,14}$/;
+const TELEGRAM_CHAT_ID_RE = /^-?\d+$/;
 
 export default function Settings() {
   const { logout } = useAuth();
   const queryClient = useQueryClient();
-  const [phone, setPhone] = useState('');
+  const [telegramChatId, setTelegramChatId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
@@ -23,7 +23,7 @@ export default function Settings() {
 
   useEffect(() => {
     if (meQuery.data) {
-      setPhone(meQuery.data.phone ?? '');
+      setTelegramChatId(meQuery.data.telegramChatId ?? '');
     }
   }, [meQuery.data]);
 
@@ -34,7 +34,7 @@ export default function Settings() {
   }, [saved]);
 
   const mutation = useMutation({
-    mutationFn: (nextPhone: string | null) => updateMe({ phone: nextPhone }),
+    mutationFn: (nextChatId: string | null) => updateMe({ telegramChatId: nextChatId }),
     onSuccess: (updated) => {
       queryClient.setQueryData<Me>(queryKeys.me, updated);
       setSaved(true);
@@ -47,9 +47,9 @@ export default function Settings() {
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const trimmed = phone.trim();
-    if (trimmed !== '' && !E164.test(trimmed)) {
-      setError('Phone must be E.164 format, e.g. +14155551212');
+    const trimmed = telegramChatId.trim();
+    if (trimmed !== '' && !TELEGRAM_CHAT_ID_RE.test(trimmed)) {
+      setError('Chat ID must be a number. Get it from @userinfobot on Telegram.');
       setSaved(false);
       return;
     }
@@ -85,7 +85,7 @@ export default function Settings() {
         ) : (
           <section className="rounded-md border border-gray-200 bg-white">
             <div className="border-b border-gray-200 px-4 py-3">
-              <h2 className="text-base font-semibold text-gray-900">WhatsApp alerts</h2>
+              <h2 className="text-base font-semibold text-gray-900">Telegram alerts</h2>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4 px-4 py-4">
@@ -103,22 +103,24 @@ export default function Settings() {
               </div>
 
               <div>
-                <label htmlFor="settings-phone" className="mb-1 block text-sm font-medium text-gray-700">
-                  WhatsApp phone
+                <label htmlFor="settings-telegram-chat-id" className="mb-1 block text-sm font-medium text-gray-700">
+                  Telegram chat ID
                 </label>
                 <input
-                  id="settings-phone"
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+14155551212"
+                  id="settings-telegram-chat-id"
+                  type="text"
+                  inputMode="numeric"
+                  value={telegramChatId}
+                  onChange={(e) => setTelegramChatId(e.target.value)}
+                  placeholder="123456789"
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <p className="mt-1 text-xs text-gray-500">
-                  Leave blank to disable WhatsApp alerts. Use E.164 format, e.g. +14155551212.
-                  During development you must first send{' '}
-                  <code className="font-mono">join &lt;code&gt;</code> to the Twilio sandbox
-                  WhatsApp number from this phone before alerts will arrive.
+                  Leave blank to disable Telegram alerts. To get your chat ID, message{' '}
+                  <code className="font-mono">@userinfobot</code> on Telegram. For group alerts,
+                  add the bot to the group and message{' '}
+                  <code className="font-mono">@userinfobot</code> there — it will reply with a
+                  negative ID.
                 </p>
               </div>
 

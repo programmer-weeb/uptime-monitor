@@ -29,7 +29,7 @@ function makeAlert(overrides: Partial<Alert> = {}): Alert {
   return {
     type: 'down',
     monitorId: 'monitor-rate-limit',
-    to: { email: 'user@example.test', phone: null },
+    to: { email: 'user@example.test', telegramChatId: null },
     monitorName: 'Example',
     monitorUrl: 'https://example.com',
     checkedAt: new Date('2026-05-17T00:00:00.000Z'),

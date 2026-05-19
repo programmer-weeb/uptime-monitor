@@ -10,7 +10,7 @@ describe('recordCheckTransition', () => {
   it('fires exactly one down alert after the second consecutive failure', async () => {
     const user = await createUser();
     const monitor = await createMonitor({ userId: user.id });
-    const monitorWithUser = { ...monitor, user: { email: user.email, phone: null } };
+    const monitorWithUser = { ...monitor, user: { email: user.email, telegramChatId: null } };
 
     const first = await recordCheckTransition({
       monitor: monitorWithUser,
@@ -28,7 +28,7 @@ describe('recordCheckTransition', () => {
 
     const secondMonitor = await prisma.monitor.findUniqueOrThrow({ where: { id: monitor.id } });
     const second = await recordCheckTransition({
-      monitor: { ...secondMonitor, user: { email: user.email, phone: null } },
+      monitor: { ...secondMonitor, user: { email: user.email, telegramChatId: null } },
       result: {
         status: 'down',
         statusCode: 503,
@@ -39,7 +39,7 @@ describe('recordCheckTransition', () => {
     });
     expect(second.alert).toMatchObject({
       type: 'down',
-      to: { email: user.email, phone: null },
+      to: { email: user.email, telegramChatId: null },
       monitorName: monitor.name,
       monitorUrl: monitor.url,
       error: 'HTTP_5XX',
@@ -49,7 +49,7 @@ describe('recordCheckTransition', () => {
 
     const thirdMonitor = await prisma.monitor.findUniqueOrThrow({ where: { id: monitor.id } });
     const third = await recordCheckTransition({
-      monitor: { ...thirdMonitor, user: { email: user.email, phone: null } },
+      monitor: { ...thirdMonitor, user: { email: user.email, telegramChatId: null } },
       result: {
         status: 'down',
         statusCode: 503,
@@ -76,7 +76,7 @@ describe('recordCheckTransition', () => {
     });
 
     const transition = await recordCheckTransition({
-      monitor: { ...downMonitor, user: { email: user.email, phone: null } },
+      monitor: { ...downMonitor, user: { email: user.email, telegramChatId: null } },
       result: {
         status: 'up',
         statusCode: 200,
@@ -88,7 +88,7 @@ describe('recordCheckTransition', () => {
 
     expect(transition.alert).toMatchObject({
       type: 'recovery',
-      to: { email: user.email, phone: null },
+      to: { email: user.email, telegramChatId: null },
     });
     expect(transition.monitor.currentStatus).toBe('up');
     expect(transition.monitor.consecutiveFailures).toBe(0);
@@ -108,7 +108,7 @@ describe('recordCheckTransition', () => {
     await expect(
       prisma.$transaction(async (tx) => {
         await writeCheckTransition(tx, {
-          monitor: { ...failingMonitor, user: { email: user.email, phone: null } },
+          monitor: { ...failingMonitor, user: { email: user.email, telegramChatId: null } },
           result: {
             status: 'down',
             statusCode: 503,

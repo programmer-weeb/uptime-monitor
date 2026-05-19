@@ -4,7 +4,7 @@ import { redisConnection } from '../config/redis.js';
 import { log } from '../config/log.js';
 import { runCheck } from '../services/checkRunner.js';
 import { sendAlertEmail } from '../services/alertEmail.js';
-import { sendAlertWhatsApp } from '../services/alertWhatsApp.js';
+import { sendAlertTelegram } from '../services/alertTelegram.js';
 import { recordCheckTransition } from '../services/statusTransition.js';
 import { CHECK_JOB_NAME, CHECKS_QUEUE_NAME, RETENTION_JOB_NAME, type CheckJobData, type ChecksQueueJobData, type ChecksQueueJobName } from './queue.js';
 import { pruneOldChecks } from './retention.js';
@@ -22,7 +22,7 @@ export async function processCheckJob(job: Job<CheckJobData, void, typeof CHECK_
       user: {
         select: {
           email: true,
-          phone: true,
+          telegramChatId: true,
         },
       },
     },
@@ -61,10 +61,10 @@ export async function processCheckJob(job: Job<CheckJobData, void, typeof CHECK_
           'alert email failed',
         );
       }),
-      sendAlertWhatsApp(transition.alert).catch((err) => {
+      sendAlertTelegram(transition.alert).catch((err) => {
         log.error(
           { err, monitorId: monitor.id, alertType: transition.alert!.type },
-          'alert whatsapp failed',
+          'alert telegram failed',
         );
       }),
     ]);

@@ -12,9 +12,7 @@ const envSchema = z.object({
   JWT_TTL_SECONDS: z.coerce.number().int().positive().default(86400),
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().optional(),
-  TWILIO_ACCOUNT_SID: z.string().optional(),
-  TWILIO_AUTH_TOKEN: z.string().optional(),
-  TWILIO_WHATSAPP_FROM: z.string().optional(),
+  TELEGRAM_BOT_TOKEN: z.string().optional(),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
 });
 
