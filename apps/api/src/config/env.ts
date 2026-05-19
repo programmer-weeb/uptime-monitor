@@ -13,6 +13,9 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().optional(),
   TELEGRAM_BOT_TOKEN: z.string().optional(),
+  TELEGRAM_BOT_USERNAME: z.string().optional(),
+  TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
+  API_PUBLIC_URL: z.string().url().optional(),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
 });
 

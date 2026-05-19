@@ -5,6 +5,7 @@ import { prisma } from './config/prisma.js';
 import { closeChecksQueue, scheduleMonitorCheck, scheduleRetentionJob } from './jobs/queue.js';
 import { createCheckWorker } from './jobs/checkProcessor.js';
 import { createRealtimeServer } from './realtime/socket.js';
+import { getBotUsername, registerWebhook } from './services/telegramBot.js';
 
 async function scheduleExistingMonitors(): Promise<void> {
   // Per plan §15.6: on worker startup, upsert a scheduler for every
@@ -29,6 +30,11 @@ async function main() {
   if (server) {
     createRealtimeServer(server);
   }
+  if (shouldRunApi && env.TELEGRAM_BOT_TOKEN && env.API_PUBLIC_URL) {
+    await getBotUsername();
+    await registerWebhook(`${env.API_PUBLIC_URL}/api/telegram/webhook`);
+  }
+
   const worker = shouldRunWorker ? createCheckWorker() : null;
 
   if (worker) {

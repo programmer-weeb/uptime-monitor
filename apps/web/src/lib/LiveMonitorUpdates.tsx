@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { io } from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
+import type { Me } from '../api/account';
 import type { Monitor, MonitorCheck } from '../api/monitors';
 import { queryKeys } from '../api/queryKeys';
 import { useAuth } from './useAuth';
@@ -24,6 +25,7 @@ type MonitorStatusChangedPayload = {
 type ServerEvents = {
   'check:completed': (payload: CheckCompletedPayload) => void;
   'monitor:status_changed': (payload: MonitorStatusChangedPayload) => void;
+  'telegram:connected': (payload: { telegramChatId: string }) => void;
 };
 
 type ClientEvents = Record<string, never>;
@@ -54,6 +56,12 @@ export function LiveMonitorUpdates() {
 
     socket.on('monitor:status_changed', ({ monitor }) => {
       mergeMonitor(queryClient, monitor);
+    });
+
+    socket.on('telegram:connected', ({ telegramChatId }) => {
+      queryClient.setQueryData<Me>(queryKeys.me, (current) =>
+        current ? { ...current, telegramChatId } : current,
+      );
     });
 
     return () => {

@@ -38,9 +38,12 @@ export type MonitorStatusChangedPayload = {
   monitor: RealtimeMonitor;
 };
 
+export type TelegramConnectedPayload = { telegramChatId: string };
+
 type ServerToClientEvents = {
   'check:completed': (payload: CheckCompletedPayload) => void;
   'monitor:status_changed': (payload: MonitorStatusChangedPayload) => void;
+  'telegram:connected': (payload: TelegramConnectedPayload) => void;
 };
 
 type ClientToServerEvents = Record<string, never>;
@@ -105,6 +108,10 @@ export function emitMonitorStatusChanged(
   payload: MonitorStatusChangedPayload,
 ): void {
   io?.to(userRoom(userId)).emit('monitor:status_changed', payload);
+}
+
+export function emitTelegramConnected(userId: string, telegramChatId: string): void {
+  io?.to(userRoom(userId)).emit('telegram:connected', { telegramChatId });
 }
 
 export function toRealtimeMonitor(monitor: {

@@ -1,9 +1,12 @@
+import { randomBytes } from 'node:crypto';
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/prisma.js';
+import { redisClient } from '../config/redis.js';
 import { ApiError } from '../lib/errors.js';
 import { requireAuth, requireNonDemo } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
+import { getBotUsername } from '../services/telegramBot.js';
 
 const TELEGRAM_CHAT_ID_RE = /^-?\d+$/;
 
@@ -40,4 +43,11 @@ accountRouter.patch('/me', requireAuth, requireNonDemo, validate(patchMeSchema),
   });
 
   res.json(user);
+});
+
+accountRouter.post('/me/telegram-connect', requireAuth, requireNonDemo, async (req: Request, res: Response) => {
+  const token = randomBytes(24).toString('hex');
+  await redisClient.set(`telegram:link:${token}`, req.user!.id, 'EX', 600);
+  const botUsername = await getBotUsername();
+  res.json({ token, botUsername });
 });
