@@ -35,7 +35,7 @@ async function main() {
       log.warn('TELEGRAM_WEBHOOK_SECRET not set — webhook endpoint has no secret validation');
     }
     await getBotUsername();
-    await registerWebhook(`${env.API_PUBLIC_URL}/api/telegram/webhook`);
+    await registerWebhook(`${env.API_PUBLIC_URL.replace(/\/$/, '')}/api/telegram/webhook`);
   }
 
   const worker = shouldRunWorker ? createCheckWorker() : null;
