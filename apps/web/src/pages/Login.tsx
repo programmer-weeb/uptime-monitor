@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { GoogleLogin } from '@react-oauth/google';
 import { ApiError, apiPost } from '../api/client';
+import { loginWithGoogle } from '../api/account';
 import { useAuth } from '../lib/useAuth';
 import type { AuthUser } from '../lib/auth-context';
 
@@ -98,6 +100,33 @@ export default function Login() {
               {submitting ? 'Signing in…' : 'Sign in'}
             </button>
           </form>
+
+          <div className="mt-4 flex items-center gap-3">
+            <hr className="flex-1 border-hairline" />
+            <span className="text-xs text-mute">or</span>
+            <hr className="flex-1 border-hairline" />
+          </div>
+
+          <div className="mt-4">
+            <GoogleLogin
+              onSuccess={async ({ credential }) => {
+                if (!credential) return;
+                setSubmitting(true);
+                try {
+                  const { token, user } = await loginWithGoogle(credential);
+                  auth.login(token, user);
+                  navigate('/', { replace: true });
+                } catch (err: unknown) {
+                  setError(err instanceof ApiError ? err.message : 'Google sign-in failed.');
+                } finally {
+                  setSubmitting(false);
+                }
+              }}
+              onError={() => setError('Google sign-in failed.')}
+              theme="filled_black"
+              shape="rectangular"
+            />
+          </div>
 
           <p className="text-sm text-mute mt-5">
             New here?{' '}

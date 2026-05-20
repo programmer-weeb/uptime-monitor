@@ -2,7 +2,7 @@ import dns from 'node:dns';
 import ipaddr from 'ipaddr.js';
 import { ApiError } from './errors.js';
 
-// IPv4 CIDR blocklist per plan §15.3.
+// Private, loopback, link-local, and reserved IPv4 ranges that monitor targets must not resolve to.
 const IPV4_BLOCKED: Array<[ipaddr.IPv4, number]> = [
   ipaddr.IPv4.parseCIDR('0.0.0.0/8'),
   ipaddr.IPv4.parseCIDR('10.0.0.0/8'),
@@ -21,7 +21,7 @@ const IPV4_BLOCKED: Array<[ipaddr.IPv4, number]> = [
   ipaddr.IPv4.parseCIDR('255.255.255.255/32'),
 ];
 
-// IPv6 CIDR blocklist per plan §15.3. IPv4-mapped (::ffff:0:0/96) is
+// Private and reserved IPv6 ranges. IPv4-mapped (::ffff:0:0/96) is
 // handled separately — we extract the embedded IPv4 and re-check.
 const IPV6_BLOCKED: Array<[ipaddr.IPv6, number]> = [
   ipaddr.IPv6.parseCIDR('::/128'),
@@ -57,8 +57,8 @@ function isAddressBlocked(raw: string): boolean {
 
 /**
  * Validates a URL for use as a monitor target. Throws an `ApiError('URL_BLOCKED', …)`
- * if the URL is malformed, not HTTPS, or resolves to any address in the §15.3
- * blocklist. Designed to be reusable from the check runner on every redirect hop.
+ * if the URL is malformed, not HTTPS, or resolves to any blocked private/reserved address.
+ * Called on the initial URL and every redirect hop to prevent SSRF.
  */
 export async function urlGuard(url: string): Promise<void> {
   let parsed: URL;

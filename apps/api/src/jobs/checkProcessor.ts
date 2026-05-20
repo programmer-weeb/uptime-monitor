@@ -41,8 +41,6 @@ export async function processCheckJob(job: Job<CheckJobData, void, typeof CHECK_
     checkedAt,
   });
 
-  // One structured log line per check completion — plan §15.4.
-  // Use the four fields the plan specifies; downstream tooling greps on these.
   log.info(
     {
       monitorId: monitor.id,
@@ -54,7 +52,7 @@ export async function processCheckJob(job: Job<CheckJobData, void, typeof CHECK_
   );
 
   if (transition.alert) {
-    await Promise.allSettled([
+    await Promise.all([
       sendAlertEmail(transition.alert).catch((err) => {
         log.error(
           { err, monitorId: monitor.id, alertType: transition.alert!.type },

@@ -26,5 +26,8 @@ export const loginSchema = z
   })
   .strict();
 
+export const googleAuthSchema = z.object({ credential: z.string().min(1) }).strict();
+
 export type SignupInput = z.infer<typeof signupSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type GoogleAuthInput = z.infer<typeof googleAuthSchema>;

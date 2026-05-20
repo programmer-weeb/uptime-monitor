@@ -1,23 +1,34 @@
 import { z } from 'zod';
 
-const envSchema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  PORT: z.coerce.number().int().positive().default(4000),
-  LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error', 'fatal']).default('info'),
-  APP_MODE: z.enum(['all', 'api', 'worker']).default('all'),
-  DATABASE_URL: z.string().url().or(z.string().startsWith('postgresql://')),
-  DATABASE_URL_TEST: z.string().optional(),
-  REDIS_URL: z.string(),
-  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 chars'),
-  JWT_TTL_SECONDS: z.coerce.number().int().positive().default(86400),
-  RESEND_API_KEY: z.string().optional(),
-  EMAIL_FROM: z.string().optional(),
-  TELEGRAM_BOT_TOKEN: z.string().optional(),
-  TELEGRAM_BOT_USERNAME: z.string().optional(),
-  TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
-  API_PUBLIC_URL: z.string().url().optional(),
-  CORS_ORIGIN: z.string().default('http://localhost:5173'),
-});
+const envSchema = z
+  .object({
+    NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+    PORT: z.coerce.number().int().positive().default(4000),
+    LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error', 'fatal']).default('info'),
+    APP_MODE: z.enum(['all', 'api', 'worker']).default('all'),
+    DATABASE_URL: z.string().url().or(z.string().startsWith('postgresql://')),
+    DATABASE_URL_TEST: z.string().optional(),
+    REDIS_URL: z.string(),
+    JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 chars'),
+    JWT_TTL_SECONDS: z.coerce.number().int().positive().default(86400),
+    RESEND_API_KEY: z.string().optional(),
+    EMAIL_FROM: z.string().optional(),
+    TELEGRAM_BOT_TOKEN: z.string().optional(),
+    TELEGRAM_BOT_USERNAME: z.string().optional(),
+    TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
+    API_PUBLIC_URL: z.string().url().optional(),
+    GOOGLE_CLIENT_ID: z.string().optional(),
+    CORS_ORIGIN: z.string().default('http://localhost:5173'),
+  })
+  .superRefine((data, ctx) => {
+    if (data.TELEGRAM_BOT_TOKEN && !data.TELEGRAM_WEBHOOK_SECRET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'TELEGRAM_WEBHOOK_SECRET is required when TELEGRAM_BOT_TOKEN is set',
+        path: ['TELEGRAM_WEBHOOK_SECRET'],
+      });
+    }
+  });
 
 const parsed = envSchema.safeParse(process.env);
 

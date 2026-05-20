@@ -61,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     let cancelled = false;
     setIsLoading(true);
-    apiGet<AuthUser>('/api/auth/me')
+    apiGet<AuthUser>('/api/me')
       .then((me) => {
         if (cancelled) return;
         setUser(me);

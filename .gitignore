@@ -10,3 +10,4 @@ coverage/
 .idea/
 .vscode/
 apps/api/prisma/migrations/dev.db*
+memory/

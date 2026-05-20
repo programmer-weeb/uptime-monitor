@@ -1,6 +1,7 @@
 import { performance } from 'node:perf_hooks';
 import { ApiError } from '../lib/errors.js';
 import { urlGuard } from '../lib/urlGuard.js';
+import { env } from '../config/env.js';
 
 export type CheckErrorClass =
   | 'TIMEOUT'
@@ -23,7 +24,7 @@ export type CheckResult = {
 const BODY_LIMIT_BYTES = 1024 * 1024;
 const MAX_REDIRECTS = 3;
 const TIMEOUT_MS = 10_000;
-const USER_AGENT = 'UptimeMonitor/1.0 (+https://your-site)';
+const USER_AGENT = `UptimeMonitor/1.0 (+${env.API_PUBLIC_URL ?? 'https://example.com'})`;
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
