@@ -41,7 +41,7 @@ describe('POST /api/auth/forgot-password', () => {
   });
 
   it('returns 200 with the generic message for a known password user', async () => {
-    const user = await createUser({ email: 'reset@example.com' });
+    await createUser({ email: 'reset@example.com' });
 
     const res = await request(app)
       .post('/api/auth/forgot-password')
@@ -113,7 +113,7 @@ describe('POST /api/auth/forgot-password', () => {
   });
 
   it('invalidates a previous token when a new one is requested', async () => {
-    const user = await createUser({ email: 'repeat@example.com' });
+    await createUser({ email: 'repeat@example.com' });
     const prevToken = 'aaa' + 'a'.repeat(45); // 48 hex chars
 
     // Simulate a previous token existing
