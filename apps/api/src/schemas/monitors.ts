@@ -10,7 +10,12 @@ const intervalSchema = z.union([
 
 const nameSchema = z.string().trim().min(1, 'Name is required').max(100, 'Name is too long');
 
-const urlSchema = z.string().min(1).max(2048);
+const urlSchema = z
+  .string()
+  .min(1)
+  .max(2048)
+  .url('Must be a valid URL')
+  .refine((url) => url.startsWith('https://'), { message: 'URL must use HTTPS' });
 
 export const createMonitorSchema = z
   .object({
