@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './lib/auth';
+import { LiveMonitorUpdates } from './lib/LiveMonitorUpdates';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -23,6 +24,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <LiveMonitorUpdates />
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
