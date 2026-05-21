@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiGet, setAuthTokenGetter } from '../api/client';
 import {
   AuthContext,
@@ -27,6 +28,7 @@ function writeStoredToken(token: string | null): void {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [token, setToken] = useState<string | null>(() => readStoredToken());
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(() => Boolean(readStoredToken()));
@@ -43,7 +45,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
     setUser(null);
     writeStoredToken(null);
-  }, []);
+    queryClient.clear();
+  }, [queryClient]);
 
   const login = useCallback((nextToken: string, nextUser: AuthUser) => {
     writeStoredToken(nextToken);
