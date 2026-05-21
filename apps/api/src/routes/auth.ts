@@ -6,6 +6,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../config/prisma.js';
 import { redisClient } from '../config/redis.js';
 import { corsOrigins, env } from '../config/env.js';
+import { log } from '../config/log.js';
 import { ApiError } from '../lib/errors.js';
 import { signToken } from '../lib/jwt.js';
 import { validate } from '../middleware/validate.js';
@@ -161,16 +162,22 @@ authRouter.post(
 
     const token = randomBytes(24).toString('hex');
 
-    const prevToken = await redisClient.get(`reset:user:${user.id}`);
-    if (prevToken) {
-      await redisClient.del(`reset:token:${prevToken}`);
+    // Redis failure or Resend failure must not reveal that the account exists —
+    // any error here is swallowed so the response is always the same generic 200.
+    try {
+      const prevToken = await redisClient.get(`reset:user:${user.id}`);
+      if (prevToken) {
+        await redisClient.del(`reset:token:${prevToken}`);
+      }
+
+      await redisClient.set(`reset:token:${token}`, user.id, 'EX', 900);
+      await redisClient.set(`reset:user:${user.id}`, token, 'EX', 900);
+
+      const resetUrl = `${corsOrigins[0]}/reset-password?token=${token}`;
+      await sendPasswordResetEmail(email, resetUrl);
+    } catch (err) {
+      log.error({ err, userId: user.id }, 'password reset email dispatch failed');
     }
-
-    await redisClient.set(`reset:token:${token}`, user.id, 'EX', 900);
-    await redisClient.set(`reset:user:${user.id}`, token, 'EX', 900);
-
-    const resetUrl = `${corsOrigins[0]}/reset-password?token=${token}`;
-    await sendPasswordResetEmail(email, resetUrl);
 
     res.json(FORGOT_PASSWORD_RESPONSE);
   },

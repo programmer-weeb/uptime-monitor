@@ -35,10 +35,7 @@ describe('sendPasswordResetEmail', () => {
     expect(call.html).toContain('15 minutes');
   });
 
-  it('skips sending and logs a warning when RESEND_API_KEY is missing', async () => {
-    // Note: Vitest's module cache prevents re-importing with a different env mock in the same test file.
-    // The guard behaviour (missing env → warn + return) is verified by inspecting the implementation
-    // directly. A production-env integration test would cover the full path.
-    // This test is structural — the env guard is present in the implementation.
-  });
+  // The guard branch (missing RESEND_API_KEY → log.warn + return) cannot be tested
+  // in this file: Vitest's module cache prevents re-importing the service with a
+  // different env mock after the first dynamic import above.
 });
