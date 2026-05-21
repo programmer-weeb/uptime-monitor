@@ -8,8 +8,12 @@ const googleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefi
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <GoogleOAuthProvider clientId={googleClientId}>
+    {googleClientId ? (
+      <GoogleOAuthProvider clientId={googleClientId}>
+        <App />
+      </GoogleOAuthProvider>
+    ) : (
       <App />
-    </GoogleOAuthProvider>
+    )}
   </StrictMode>,
 )

@@ -107,32 +107,36 @@ export default function Signup() {
             </button>
           </form>
 
-          <div className="mt-4 flex items-center gap-3">
-            <hr className="flex-1 border-hairline" />
-            <span className="text-xs text-mute">or</span>
-            <hr className="flex-1 border-hairline" />
-          </div>
+          {import.meta.env.VITE_GOOGLE_CLIENT_ID && (
+            <>
+              <div className="mt-4 flex items-center gap-3">
+                <hr className="flex-1 border-hairline" />
+                <span className="text-xs text-mute">or</span>
+                <hr className="flex-1 border-hairline" />
+              </div>
 
-          <div className="mt-4">
-            <GoogleLogin
-              onSuccess={async ({ credential }) => {
-                if (!credential) return;
-                setSubmitting(true);
-                try {
-                  const { token, user } = await loginWithGoogle(credential);
-                  auth.login(token, user);
-                  navigate('/', { replace: true });
-                } catch (err: unknown) {
-                  setError(err instanceof ApiError ? err.message : 'Google sign-in failed.');
-                } finally {
-                  setSubmitting(false);
-                }
-              }}
-              onError={() => setError('Google sign-in failed.')}
-              theme="filled_black"
-              shape="rectangular"
-            />
-          </div>
+              <div className="mt-4">
+                <GoogleLogin
+                  onSuccess={async ({ credential }) => {
+                    if (!credential) return;
+                    setSubmitting(true);
+                    try {
+                      const { token, user } = await loginWithGoogle(credential);
+                      auth.login(token, user);
+                      navigate('/', { replace: true });
+                    } catch (err: unknown) {
+                      setError(err instanceof ApiError ? err.message : 'Google sign-in failed.');
+                    } finally {
+                      setSubmitting(false);
+                    }
+                  }}
+                  onError={() => setError('Google sign-in failed.')}
+                  theme="filled_black"
+                  shape="rectangular"
+                />
+              </div>
+            </>
+          )}
 
           <p className="text-sm text-mute mt-5">
             Already have an account?{' '}
