@@ -5,7 +5,7 @@ import { OAuth2Client } from 'google-auth-library';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/prisma.js';
 import { redisClient } from '../config/redis.js';
-import { env } from '../config/env.js';
+import { corsOrigins, env } from '../config/env.js';
 import { ApiError } from '../lib/errors.js';
 import { signToken } from '../lib/jwt.js';
 import { validate } from '../middleware/validate.js';
@@ -167,7 +167,7 @@ authRouter.post(
     await redisClient.set(`reset:token:${token}`, user.id, 'EX', 900);
     await redisClient.set(`reset:user:${user.id}`, token, 'EX', 900);
 
-    const resetUrl = `${env.CORS_ORIGIN}/reset-password?token=${token}`;
+    const resetUrl = `${corsOrigins[0]}/reset-password?token=${token}`;
     await sendPasswordResetEmail(email, resetUrl);
 
     res.json(FORGOT_PASSWORD_RESPONSE);
