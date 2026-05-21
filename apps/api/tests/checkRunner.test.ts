@@ -90,7 +90,7 @@ describe('runCheck', () => {
       expect.any(String),
       expect.objectContaining({
         headers: {
-          'User-Agent': 'UptimeMonitor/1.0 (+https://your-site)',
+          'User-Agent': 'UptimeMonitor/1.0 (+https://example.com)',
         },
       }),
     );

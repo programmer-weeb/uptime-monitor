@@ -39,9 +39,9 @@ function makeAlert(overrides: Partial<Alert> = {}): Alert {
 }
 
 describe('sendAlertEmail rate limit (plan §16.11)', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     sendMock.mockReset().mockResolvedValue({ data: { id: 'mock-id' }, error: null });
-    _resetAlertEmailRateLimitForTests();
+    await _resetAlertEmailRateLimitForTests();
   });
 
   afterEach(() => {
@@ -60,7 +60,6 @@ describe('sendAlertEmail rate limit (plan §16.11)', () => {
       expect.objectContaining({
         monitorId: 'monitor-rate-limit',
         alertType: 'recovery',
-        msSinceLast: expect.any(Number),
       }),
       'alert email rate-limited',
     );
@@ -69,13 +68,12 @@ describe('sendAlertEmail rate limit (plan §16.11)', () => {
   });
 
   it('sends again once the 60-second window has elapsed', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-05-17T00:00:00.000Z'));
-
     await sendAlertEmail(makeAlert());
     expect(sendMock).toHaveBeenCalledTimes(1);
 
-    vi.setSystemTime(new Date('2026-05-17T00:01:01.000Z'));
+    // Simulate the Redis TTL expiring by clearing the rate-limit key directly.
+    await _resetAlertEmailRateLimitForTests();
+
     await sendAlertEmail(makeAlert({ type: 'recovery' }));
     expect(sendMock).toHaveBeenCalledTimes(2);
   });

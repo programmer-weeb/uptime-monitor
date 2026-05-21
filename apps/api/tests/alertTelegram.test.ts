@@ -46,7 +46,7 @@ describe('sendAlertTelegram rate limit', () => {
 
   it('sends the first alert and rate-limits a second within 60 seconds', async () => {
     const { sendAlertTelegram, _resetAlertTelegramRateLimitForTests, log } = await loadService();
-    _resetAlertTelegramRateLimitForTests();
+    await _resetAlertTelegramRateLimitForTests();
     const warnSpy = vi.spyOn(log, 'warn');
 
     await sendAlertTelegram(makeAlert({ type: 'down' }));
@@ -67,14 +67,14 @@ describe('sendAlertTelegram rate limit', () => {
 
   it('sends again after 60-second window', async () => {
     const { sendAlertTelegram, _resetAlertTelegramRateLimitForTests } = await loadService();
-    _resetAlertTelegramRateLimitForTests();
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-05-17T00:00:00.000Z'));
+    await _resetAlertTelegramRateLimitForTests();
 
     await sendAlertTelegram(makeAlert());
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
-    vi.setSystemTime(new Date('2026-05-17T00:01:01.000Z'));
+    // Simulate the Redis TTL expiring by clearing the rate-limit key directly.
+    await _resetAlertTelegramRateLimitForTests();
+
     await sendAlertTelegram(makeAlert({ type: 'recovery' }));
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });

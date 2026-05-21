@@ -13,7 +13,7 @@ const bearer = (token: string): [string, string] => ['Authorization', `Bearer ${
 describe('GET /api/me', () => {
   it('returns the authenticated user profile including telegramChatId', async () => {
     const user = await createUser({ telegramChatId: '123456789' });
-    const res = await request(app).get('/api/me').set(...bearer(signToken(user.id)));
+    const res = await request(app).get('/api/me').set(...bearer(signToken(user.id, user.email, user.isDemo)));
 
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({
@@ -29,7 +29,7 @@ describe('GET /api/me', () => {
 describe('PATCH /api/me', () => {
   it('updates the telegram chat ID', async () => {
     const user = await createUser();
-    const token = signToken(user.id);
+    const token = signToken(user.id, user.email, user.isDemo);
 
     const res = await request(app)
       .patch('/api/me')
@@ -45,7 +45,7 @@ describe('PATCH /api/me', () => {
 
   it('clears the telegram chat ID when set to null', async () => {
     const user = await createUser({ telegramChatId: '123456789' });
-    const token = signToken(user.id);
+    const token = signToken(user.id, user.email, user.isDemo);
 
     const res = await request(app)
       .patch('/api/me')
@@ -58,7 +58,7 @@ describe('PATCH /api/me', () => {
 
   it('rejects invalid telegram chat IDs with validation', async () => {
     const user = await createUser();
-    const token = signToken(user.id);
+    const token = signToken(user.id, user.email, user.isDemo);
 
     const res = await request(app)
       .patch('/api/me')

@@ -20,6 +20,15 @@ vi.mock('../src/config/redis.js', () => ({
   redisClient: redisMock,
 }));
 
+vi.mock('../src/config/env.js', () => ({
+  env: {
+    NODE_ENV: 'test',
+    LOG_LEVEL: 'warn',
+    TELEGRAM_WEBHOOK_SECRET: 'test-webhook-secret',
+  },
+  corsOrigins: ['http://localhost:5173'],
+}));
+
 vi.mock('../src/services/telegramBot.js', () => ({
   getBotUsername: vi.fn().mockResolvedValue('TestUptimeBot'),
   sendTelegramMessage: sendTelegramMessageMock,
@@ -35,7 +44,10 @@ vi.mock('../src/realtime/socket.js', async (importOriginal) => {
 const app = createApp();
 
 function post(body: unknown) {
-  return request(app).post('/api/telegram/webhook').send(body);
+  return request(app)
+    .post('/api/telegram/webhook')
+    .set('x-telegram-bot-api-secret-token', 'test-webhook-secret')
+    .send(body);
 }
 
 describe('POST /api/telegram/webhook', () => {
