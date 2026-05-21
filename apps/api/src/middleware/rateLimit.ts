@@ -45,3 +45,10 @@ export const googleAuthLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: isTest ? 1000 : 10,
 });
+
+// 5 forgot-password requests per hour per IP.
+export const forgotPasswordLimiter = rateLimit({
+  ...baseOpts,
+  windowMs: 60 * 60 * 1000,
+  limit: isTest ? 1000 : 5,
+});
