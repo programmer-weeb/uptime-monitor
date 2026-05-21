@@ -3,7 +3,6 @@ import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { prisma } from './helpers.js';
 import { createUser } from './factories.js';
-import './helpers.js';
 
 // ── Redis mock ──────────────────────────────────────────────────────────────
 const { redisMock } = vi.hoisted(() => ({
@@ -114,7 +113,7 @@ describe('POST /api/auth/forgot-password', () => {
 
   it('invalidates a previous token when a new one is requested', async () => {
     await createUser({ email: 'repeat@example.com' });
-    const prevToken = 'aaa' + 'a'.repeat(45); // 48 hex chars
+    const prevToken = 'a'.repeat(48);
 
     // Simulate a previous token existing
     redisMock.get.mockResolvedValueOnce(prevToken);
