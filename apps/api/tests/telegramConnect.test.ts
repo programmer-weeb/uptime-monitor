@@ -37,7 +37,7 @@ describe('POST /api/me/telegram-connect', () => {
     const user = await createUser();
     const res = await request(app)
       .post('/api/me/telegram-connect')
-      .set(...bearer(signToken(user.id)));
+      .set(...bearer(signToken(user.id, user.email, user.isDemo)));
 
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({
@@ -54,7 +54,7 @@ describe('POST /api/me/telegram-connect', () => {
 
   it('each call generates a unique token', async () => {
     const user = await createUser();
-    const token = signToken(user.id);
+    const token = signToken(user.id, user.email, user.isDemo);
     const [res1, res2] = await Promise.all([
       request(app).post('/api/me/telegram-connect').set(...bearer(token)),
       request(app).post('/api/me/telegram-connect').set(...bearer(token)),
@@ -71,7 +71,7 @@ describe('POST /api/me/telegram-connect', () => {
     const user = await createUser({ isDemo: true });
     const res = await request(app)
       .post('/api/me/telegram-connect')
-      .set(...bearer(signToken(user.id)));
+      .set(...bearer(signToken(user.id, user.email, user.isDemo)));
     expect(res.status).toBe(403);
   });
 });
