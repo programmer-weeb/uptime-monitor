@@ -139,6 +139,7 @@ describe('POST /api/auth/forgot-password', () => {
 describe('POST /api/auth/reset-password', () => {
   beforeEach(() => {
     redisMock.get.mockClear();
+    redisMock.set.mockClear();
     redisMock.del.mockClear();
   });
 
