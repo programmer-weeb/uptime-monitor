@@ -68,7 +68,10 @@ export async function processCheckJob(job: Job<CheckJobData, void, typeof CHECK_
     ]);
   }
 
-  const realtimeMonitor = toRealtimeMonitor(transition.monitor);
+  const realtimeMonitor = toRealtimeMonitor({
+    ...transition.monitor,
+    lastLatencyMs: result.status === 'up' ? result.latencyMs : null,
+  });
   emitCheckCompleted(monitor.userId, {
     monitor: realtimeMonitor,
     check: toRealtimeCheck(transition.check),

@@ -14,6 +14,7 @@ export type RealtimeMonitor = {
   currentStatus: 'up' | 'down' | 'unknown';
   lastCheckedAt: string | null;
   createdAt: string;
+  lastLatencyMs?: number | null;
 };
 
 export type RealtimeCheck = {
@@ -123,6 +124,7 @@ export function toRealtimeMonitor(monitor: {
   currentStatus: RealtimeMonitor['currentStatus'];
   lastCheckedAt: Date | string | null;
   createdAt: Date | string;
+  lastLatencyMs?: number | null;
 }): RealtimeMonitor {
   return {
     ...monitor,

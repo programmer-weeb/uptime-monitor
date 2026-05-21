@@ -11,11 +11,6 @@ export type Monitor = {
   currentStatus: MonitorStatus;
   lastCheckedAt?: string | null;
   lastLatencyMs?: number | null;
-  latencyMs?: number | null;
-  lastCheck?: {
-    latencyMs?: number | null;
-    checkedAt?: string | null;
-  } | null;
   createdAt?: string;
 };
 
