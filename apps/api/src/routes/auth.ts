@@ -140,6 +140,8 @@ const FORGOT_PASSWORD_RESPONSE = {
   message: 'If that email is registered, a reset link has been sent.',
 };
 
+const RESET_PASSWORD_RESPONSE = { message: 'Password updated.' };
+
 authRouter.post(
   '/forgot-password',
   forgotPasswordLimiter,
@@ -174,6 +176,8 @@ authRouter.post(
   },
 );
 
+// No IP rate limiter: bcrypt only runs after a successful Redis lookup, and
+// guessing a 192-bit token is computationally infeasible. The token is the limiter.
 authRouter.post(
   '/reset-password',
   validate(resetPasswordSchema),
@@ -185,6 +189,7 @@ authRouter.post(
       throw new ApiError('VALIDATION', 'INVALID_RESET_TOKEN');
     }
 
+    // Defensive: guard against a valid token pointing to a since-deleted user.
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
     if (!user) {
       throw new ApiError('VALIDATION', 'INVALID_RESET_TOKEN');
@@ -195,6 +200,6 @@ authRouter.post(
 
     await redisClient.del(`reset:token:${token}`, `reset:user:${userId}`);
 
-    res.json({ message: 'Password updated.' });
+    res.json(RESET_PASSWORD_RESPONSE);
   },
 );

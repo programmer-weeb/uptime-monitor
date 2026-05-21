@@ -32,7 +32,7 @@ export const forgotPasswordSchema = z.object({ email: emailSchema }).strict();
 
 export const resetPasswordSchema = z
   .object({
-    token: z.string().min(1),
+    token: z.string().regex(/^[a-f0-9]{48}$/, 'Invalid reset token format'),
     password: passwordSchema,
   })
   .strict();
