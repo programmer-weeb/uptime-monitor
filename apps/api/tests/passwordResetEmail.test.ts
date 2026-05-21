@@ -18,7 +18,6 @@ vi.mock('../src/config/env.js', () => ({
 }));
 
 const { sendPasswordResetEmail } = await import('../src/services/passwordResetEmail.js');
-const { log } = await import('../src/config/log.js');
 
 describe('sendPasswordResetEmail', () => {
   beforeEach(() => {
