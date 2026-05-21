@@ -173,3 +173,28 @@ authRouter.post(
     res.json(FORGOT_PASSWORD_RESPONSE);
   },
 );
+
+authRouter.post(
+  '/reset-password',
+  validate(resetPasswordSchema),
+  async (req: Request, res: Response) => {
+    const { token, password } = req.body as ResetPasswordInput;
+
+    const userId = await redisClient.get(`reset:token:${token}`);
+    if (!userId) {
+      throw new ApiError('VALIDATION', 'INVALID_RESET_TOKEN');
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+    if (!user) {
+      throw new ApiError('VALIDATION', 'INVALID_RESET_TOKEN');
+    }
+
+    const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
+    await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+
+    await redisClient.del(`reset:token:${token}`, `reset:user:${userId}`);
+
+    res.json({ message: 'Password updated.' });
+  },
+);

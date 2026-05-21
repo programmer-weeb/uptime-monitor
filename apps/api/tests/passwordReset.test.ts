@@ -135,3 +135,97 @@ describe('POST /api/auth/forgot-password', () => {
     expect(res.body.error).toBe('VALIDATION');
   });
 });
+
+describe('POST /api/auth/reset-password', () => {
+  beforeEach(() => {
+    redisMock.get.mockClear();
+    redisMock.del.mockClear();
+  });
+
+  it('returns 200 and updates the password for a valid token', async () => {
+    const user = await createUser({ email: 'newpass@example.com', password: 'oldpassword1' });
+    redisMock.get.mockResolvedValueOnce(user.id);
+
+    const res = await request(app)
+      .post('/api/auth/reset-password')
+      .send({ token: 'a'.repeat(48), password: 'newpassword99' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Password updated.');
+  });
+
+  it('new password is persisted — user can log in with it', async () => {
+    const user = await createUser({ email: 'verify@example.com', password: 'oldpassword1' });
+    redisMock.get.mockResolvedValueOnce(user.id);
+
+    await request(app)
+      .post('/api/auth/reset-password')
+      .send({ token: 'b'.repeat(48), password: 'brandnewpass1' });
+
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'verify@example.com', password: 'brandnewpass1' });
+
+    expect(loginRes.status).toBe(200);
+    expect(loginRes.body.token).toEqual(expect.any(String));
+  });
+
+  it('old password no longer works after reset', async () => {
+    const user = await createUser({ email: 'oldpass@example.com', password: 'oldpassword1' });
+    redisMock.get.mockResolvedValueOnce(user.id);
+
+    await request(app)
+      .post('/api/auth/reset-password')
+      .send({ token: 'c'.repeat(48), password: 'completelynew1' });
+
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'oldpass@example.com', password: 'oldpassword1' });
+
+    expect(loginRes.status).toBe(401);
+  });
+
+  it('DELs both Redis keys after a successful reset (single-use)', async () => {
+    const user = await createUser({ email: 'singleuse@example.com' });
+    const token = 'd'.repeat(48);
+    redisMock.get.mockResolvedValueOnce(user.id);
+
+    await request(app)
+      .post('/api/auth/reset-password')
+      .send({ token, password: 'freshpassword1' });
+
+    expect(redisMock.del).toHaveBeenCalledWith(
+      `reset:token:${token}`,
+      `reset:user:${user.id}`,
+    );
+  });
+
+  it('returns 400 INVALID_RESET_TOKEN for an unknown or expired token', async () => {
+    // redisMock.get returns null by default (token not found)
+    const res = await request(app)
+      .post('/api/auth/reset-password')
+      .send({ token: 'e'.repeat(48), password: 'somepassword1' });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({ error: 'VALIDATION', message: 'INVALID_RESET_TOKEN' });
+    expect(redisMock.del).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 VALIDATION for a password shorter than 8 characters', async () => {
+    const res = await request(app)
+      .post('/api/auth/reset-password')
+      .send({ token: 'f'.repeat(48), password: 'short' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('VALIDATION');
+  });
+
+  it('returns 400 VALIDATION when token is missing', async () => {
+    const res = await request(app)
+      .post('/api/auth/reset-password')
+      .send({ password: 'somepassword1' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('VALIDATION');
+  });
+});
