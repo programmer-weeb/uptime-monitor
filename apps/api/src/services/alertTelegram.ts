@@ -1,9 +1,9 @@
 import { env } from '../config/env.js';
 import { log } from '../config/log.js';
+import { redisClient } from '../config/redis.js';
 import type { Alert } from './statusTransition.js';
 
-const RATE_LIMIT_MS = 60_000;
-const lastSentAtByMonitor = new Map<string, number>();
+const RATE_LIMIT_SECS = 60;
 
 export async function sendAlertTelegram(alert: Alert): Promise<void> {
   if (!alert.to.telegramChatId) {
@@ -18,11 +18,11 @@ export async function sendAlertTelegram(alert: Alert): Promise<void> {
     return;
   }
 
-  const now = Date.now();
-  const last = lastSentAtByMonitor.get(alert.monitorId);
-  if (last !== undefined && now - last < RATE_LIMIT_MS) {
+  const key = `alert:rate:telegram:${alert.monitorId}`;
+  const acquired = await redisClient.set(key, '1', 'EX', RATE_LIMIT_SECS, 'NX');
+  if (acquired === null) {
     log.warn(
-      { monitorId: alert.monitorId, alertType: alert.type, msSinceLast: now - last },
+      { monitorId: alert.monitorId, alertType: alert.type },
       'alert telegram rate-limited',
     );
     return;
@@ -43,12 +43,11 @@ export async function sendAlertTelegram(alert: Alert): Promise<void> {
     const text = await response.text();
     throw new Error(`Telegram sendMessage failed: ${response.status} ${text}`);
   }
-
-  lastSentAtByMonitor.set(alert.monitorId, now);
 }
 
-export function _resetAlertTelegramRateLimitForTests(): void {
-  lastSentAtByMonitor.clear();
+export async function _resetAlertTelegramRateLimitForTests(): Promise<void> {
+  const keys = await redisClient.keys('alert:rate:telegram:*');
+  if (keys.length > 0) await redisClient.del(...keys);
 }
 
 function escapeHtml(value: string): string {

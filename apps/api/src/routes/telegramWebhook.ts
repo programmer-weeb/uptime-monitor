@@ -23,7 +23,7 @@ telegramWebhookRouter.post('/telegram/webhook', (req: Request, res: Response) =>
 });
 
 async function handleUpdate(update: TelegramUpdate, secretHeader: string | undefined): Promise<void> {
-  if (env.TELEGRAM_WEBHOOK_SECRET && secretHeader !== env.TELEGRAM_WEBHOOK_SECRET) {
+  if (!env.TELEGRAM_WEBHOOK_SECRET || secretHeader !== env.TELEGRAM_WEBHOOK_SECRET) {
     log.warn('telegram webhook: invalid secret token, ignoring update');
     return;
   }

@@ -21,12 +21,21 @@ const bearer = (token: string): [string, string] => ['Authorization', `Bearer ${
 
 async function authedUser() {
   const user = await createUser();
-  return { user, token: signToken(user.id) };
+  return { user, token: signToken(user.id, user.email, user.isDemo) };
 }
 
+// Default DNS mock: resolve any hostname to a public IP so urlGuard passes.
+// Individual tests that need specific DNS behaviour override this locally.
+let defaultLookupSpy: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
   scheduleMonitorCheckMock.mockClear();
   removeMonitorScheduleMock.mockClear();
+  defaultLookupSpy = vi.spyOn(dns.promises, 'lookup').mockResolvedValue(
+    [{ address: '93.184.216.34', family: 4 }] as unknown as dns.LookupAddress[],
+  );
+});
+afterEach(() => {
+  defaultLookupSpy.mockRestore();
 });
 
 describe('GET /api/monitors', () => {
@@ -106,34 +115,24 @@ describe('POST /api/monitors', () => {
     expect(res.body.error).toBe('VALIDATION');
   });
 
-  it('rejects http:// URLs with 422 URL_BLOCKED', async () => {
+  it('rejects http:// URLs with 400 VALIDATION (schema enforces HTTPS)', async () => {
     const { token } = await authedUser();
     const res = await request(app)
       .post('/api/monitors')
       .set(...bearer(token))
       .send({ name: 'X', url: 'http://example.com', intervalMinutes: 5 });
-    expect(res.status).toBe(422);
-    expect(res.body.error).toBe('URL_BLOCKED');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('VALIDATION');
   });
 
-  it('rejects http://localhost with 422 URL_BLOCKED', async () => {
+  it('rejects http://localhost with 400 VALIDATION (schema enforces HTTPS)', async () => {
     const { token } = await authedUser();
     const res = await request(app)
       .post('/api/monitors')
       .set(...bearer(token))
       .send({ name: 'X', url: 'http://localhost', intervalMinutes: 5 });
-    expect(res.status).toBe(422);
-    expect(res.body.error).toBe('URL_BLOCKED');
-  });
-
-  it('rejects https://localhost (loopback resolution) with 422 URL_BLOCKED', async () => {
-    const { token } = await authedUser();
-    const res = await request(app)
-      .post('/api/monitors')
-      .set(...bearer(token))
-      .send({ name: 'X', url: 'https://localhost', intervalMinutes: 5 });
-    expect(res.status).toBe(422);
-    expect(res.body.error).toBe('URL_BLOCKED');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('VALIDATION');
   });
 
   it('rejects literal RFC1918 IPv4 hosts', async () => {
@@ -163,6 +162,17 @@ describe('POST /api/monitors', () => {
     });
     afterEach(() => {
       lookupSpy.mockRestore();
+    });
+
+    it('rejects https://localhost (loopback resolution) with 422 URL_BLOCKED', async () => {
+      lookupSpy.mockResolvedValue([{ address: '127.0.0.1', family: 4 }] as unknown as dns.LookupAddress[]);
+      const { token } = await authedUser();
+      const res = await request(app)
+        .post('/api/monitors')
+        .set(...bearer(token))
+        .send({ name: 'X', url: 'https://localhost', intervalMinutes: 5 });
+      expect(res.status).toBe(422);
+      expect(res.body.error).toBe('URL_BLOCKED');
     });
 
     it('rejects a hostname that resolves to the cloud metadata IP (169.254.169.254)', async () => {
@@ -507,8 +517,6 @@ describe('PATCH /api/monitors/:id', () => {
   describe('url edit', () => {
     it('updates the url and resets currentStatus + consecutiveFailures', async () => {
       const { user, token } = await authedUser();
-      // Both example.com and example.org are IANA-reserved domains that
-      // resolve in real DNS, so urlGuard passes without needing a mock.
       const m = await createMonitor({ userId: user.id, url: 'https://example.com' });
       // Pre-seed a "down-trending" state so we can assert the reset.
       await prisma.monitor.update({
@@ -553,15 +561,15 @@ describe('PATCH /api/monitors/:id', () => {
       expect(reloaded?.name).toBe('Renamed');
     });
 
-    it('rejects a blocked URL with 422 URL_BLOCKED', async () => {
+    it('rejects a non-HTTPS URL with 400 VALIDATION', async () => {
       const { user, token } = await authedUser();
       const m = await createMonitor({ userId: user.id });
       const res = await request(app)
         .patch(`/api/monitors/${m.id}`)
         .set(...bearer(token))
         .send({ url: 'http://localhost' });
-      expect(res.status).toBe(422);
-      expect(res.body.error).toBe('URL_BLOCKED');
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('VALIDATION');
 
       const reloaded = await prisma.monitor.findUnique({ where: { id: m.id } });
       expect(reloaded?.url).toBe(m.url);
@@ -639,7 +647,7 @@ describe('DELETE /api/monitors/:id', () => {
 describe('demo account write-gate', () => {
   async function demoUser() {
     const user = await createUser({ isDemo: true });
-    return { user, token: signToken(user.id) };
+    return { user, token: signToken(user.id, user.email, user.isDemo) };
   }
 
   it('rejects POST /api/monitors with 403 FORBIDDEN', async () => {

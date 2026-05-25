@@ -1,5 +1,4 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
-import { prisma } from '../config/prisma.js';
 import { ApiError } from '../lib/errors.js';
 import { verifyToken } from '../lib/jwt.js';
 
@@ -37,15 +36,7 @@ export const requireAuth: RequestHandler = async (
       throw new ApiError('UNAUTHORIZED', 'Authentication required');
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: claims.sub },
-      select: { id: true, email: true, isDemo: true },
-    });
-    if (!user) {
-      throw new ApiError('UNAUTHORIZED', 'Authentication required');
-    }
-
-    req.user = user;
+    req.user = { id: claims.sub, email: claims.email, isDemo: claims.isDemo };
     next();
   } catch (err) {
     next(err);

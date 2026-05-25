@@ -39,3 +39,16 @@ export const telegramConnectLimiter = rateLimit({
   limit: isTest ? 1000 : 5,
   keyGenerator: (req) => req.user?.id ?? req.ip ?? 'anonymous',
 });
+
+export const googleAuthLimiter = rateLimit({
+  ...baseOpts,
+  windowMs: 60 * 1000,
+  limit: isTest ? 1000 : 10,
+});
+
+// 5 forgot-password requests per hour per IP.
+export const forgotPasswordLimiter = rateLimit({
+  ...baseOpts,
+  windowMs: 60 * 60 * 1000,
+  limit: isTest ? 1000 : 5,
+});

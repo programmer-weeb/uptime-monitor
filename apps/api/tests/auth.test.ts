@@ -86,32 +86,32 @@ describe('POST /api/auth/login', () => {
   });
 });
 
-describe('GET /api/auth/me', () => {
+describe('GET /api/me', () => {
   it('returns 401 without a token', async () => {
-    const res = await request(app).get('/api/auth/me');
+    const res = await request(app).get('/api/me');
     expect(res.status).toBe(401);
     expect(res.body.error).toBe('UNAUTHORIZED');
   });
 
   it('returns 401 with a malformed token', async () => {
     const res = await request(app)
-      .get('/api/auth/me')
+      .get('/api/me')
       .set('Authorization', 'Bearer not-a-real-jwt');
     expect(res.status).toBe(401);
   });
 
   it('returns 401 if the user behind a valid token no longer exists', async () => {
-    const orphan = signToken('clx0000000000000000000000');
-    const res = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${orphan}`);
+    const orphan = signToken('clx0000000000000000000000', 'orphan@example.com', false);
+    const res = await request(app).get('/api/me').set('Authorization', `Bearer ${orphan}`);
     expect(res.status).toBe(401);
   });
 
   it('returns the user when given a valid token', async () => {
     const user = await createUser({ email: 'me@example.com' });
-    const token = signToken(user.id);
-    const res = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`);
+    const token = signToken(user.id, user.email, user.isDemo);
+    const res = await request(app).get('/api/me').set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ id: user.id, email: 'me@example.com', isDemo: false });
+    expect(res.body).toMatchObject({ id: user.id, email: 'me@example.com', isDemo: false });
   });
 });

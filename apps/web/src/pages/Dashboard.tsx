@@ -203,7 +203,7 @@ function MonitorTable({ monitors }: { monitors: Monitor[] }) {
                 <StatusBadge status={monitor.currentStatus} />
               </td>
               <td className="px-5 py-3.5 text-charcoal text-xs">
-                {formatDateTime(monitor.lastCheckedAt ?? monitor.lastCheck?.checkedAt)}
+                {formatDateTime(monitor.lastCheckedAt)}
               </td>
               <td className="px-5 py-3.5 text-right tabular-nums text-charcoal text-xs font-mono">
                 {formatLatency(getLatency(monitor))}
@@ -377,7 +377,7 @@ function monitorsSummary(isLoading: boolean, count: number): string {
 }
 
 function getLatency(monitor: Monitor): number | null | undefined {
-  return monitor.lastLatencyMs ?? monitor.latencyMs ?? monitor.lastCheck?.latencyMs;
+  return monitor.lastLatencyMs;
 }
 
 function formatLatency(value: number | null | undefined): string {

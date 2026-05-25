@@ -1,4 +1,7 @@
+import type { AuthUser } from '../lib/auth-context';
 import { apiGet, apiPatch, apiPost } from './client';
+
+export type AuthResponse = { token: string; user: AuthUser };
 
 export type Me = {
   id: string;
@@ -23,4 +26,8 @@ export function updateMe(input: { telegramChatId: string | null }): Promise<Me> 
 
 export function connectTelegram(): Promise<TelegramConnectResponse> {
   return apiPost<TelegramConnectResponse>('/api/me/telegram-connect');
+}
+
+export function loginWithGoogle(credential: string): Promise<AuthResponse> {
+  return apiPost<AuthResponse>('/api/auth/google', { credential });
 }

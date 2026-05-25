@@ -49,7 +49,20 @@ const MONITOR_SELECT = {
   currentStatus: true,
   lastCheckedAt: true,
   createdAt: true,
+  checks: {
+    take: 1,
+    orderBy: { checkedAt: 'desc' as const },
+    where: { status: 'up' as const },
+    select: { latencyMs: true },
+  },
 } as const;
+
+function toResponse<T extends { checks: ReadonlyArray<{ latencyMs: number }> }>(
+  m: T,
+): Omit<T, 'checks'> & { lastLatencyMs: number | null } {
+  const { checks, ...rest } = m;
+  return { ...(rest as unknown as Omit<T, 'checks'>), lastLatencyMs: checks[0]?.latencyMs ?? null };
+}
 
 export const monitorsRouter = Router();
 
@@ -61,7 +74,7 @@ monitorsRouter.get('/', async (req: Request, res: Response) => {
     orderBy: { createdAt: 'desc' },
     select: MONITOR_SELECT,
   });
-  res.json(monitors);
+  res.json(monitors.map(toResponse));
 });
 
 monitorsRouter.post(
@@ -92,7 +105,7 @@ monitorsRouter.post(
       select: MONITOR_SELECT,
     });
     await scheduleMonitorCheck(monitor);
-    res.status(201).json(monitor);
+    res.status(201).json(toResponse(monitor));
   },
 );
 
@@ -194,7 +207,7 @@ monitorsRouter.get(
     if (!monitor) {
       throw new ApiError('NOT_FOUND', 'Monitor not found');
     }
-    res.json(monitor);
+    res.json(toResponse(monitor));
   },
 );
 
@@ -248,7 +261,7 @@ monitorsRouter.patch(
       throw new ApiError('NOT_FOUND', 'Monitor not found');
     }
     await scheduleMonitorCheck(monitor);
-    res.json(monitor);
+    res.json(toResponse(monitor));
   },
 );
 
